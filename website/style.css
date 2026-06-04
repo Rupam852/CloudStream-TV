@@ -1171,6 +1171,9 @@ footer {
         flex-direction: row;
         justify-content: space-between;
         align-items: center;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: #070a13 !important;
     }
 
     .menu-toggle {
@@ -1195,7 +1198,7 @@ footer {
     .nav-menu {
         position: fixed;
         top: 0;
-        right: -100%;
+        left: 0;
         width: 100%;
         height: 100vh;
         background: rgba(7, 10, 19, 0.98);
@@ -1206,13 +1209,16 @@ footer {
         align-items: center;
         justify-content: center;
         gap: 30px;
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         z-index: 140;
         padding: 40px;
+        
+        /* GPU Accelerated Slide Transition */
+        transform: translateX(100%);
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .nav-menu.active {
-        right: 0;
+        transform: translateX(0);
     }
 
     .nav-menu a {
@@ -1223,10 +1229,11 @@ footer {
     }
 
     .nav-menu .download-nav-btn {
-        width: 80%;
-        max-width: 260px;
-        padding: 14px 28px;
-        font-size: 1.05rem;
+        width: 80% !important;
+        max-width: 260px !important;
+        padding: 14px 28px !important;
+        font-size: 1.05rem !important;
+        border-radius: 12px !important;
         text-align: center;
         margin-top: 10px;
     }
