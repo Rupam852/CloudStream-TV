@@ -97,24 +97,35 @@ header {
     text-decoration: none;
 }
 
-.logo-img {
+.logo-wrapper {
     width: 40px;
     height: 40px;
-    border-radius: 10px; /* Slightly rounded */
-    border: 1.5px solid rgba(6, 182, 212, 0.25);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid rgba(6, 182, 212, 0.35);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4),
-                0 0 12px rgba(6, 182, 212, 0.35),
-                0 0 25px rgba(99, 102, 241, 0.15);
-    object-fit: cover;
+                0 0 15px rgba(6, 182, 212, 0.5),
+                0 0 25px rgba(99, 102, 241, 0.25);
+    background: #070a13;
+    overflow: visible;
     transition: var(--transition);
 }
 
-.logo-img:hover {
-    border-color: rgba(6, 182, 212, 0.6);
+.logo-wrapper:hover {
+    border-color: rgba(6, 182, 212, 0.7);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5),
-                0 0 18px rgba(6, 182, 212, 0.55),
-                0 0 35px rgba(99, 102, 241, 0.3);
+                0 0 22px rgba(6, 182, 212, 0.7),
+                0 0 35px rgba(99, 102, 241, 0.45);
     transform: scale(1.05);
+}
+
+.logo-img {
+    width: 100%;
+    height: 100%;
+    border-radius: 8.5px;
+    object-fit: cover;
 }
 
 .logo-icon {
