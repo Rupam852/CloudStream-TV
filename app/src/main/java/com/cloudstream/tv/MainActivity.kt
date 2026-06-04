@@ -83,10 +83,11 @@ class MainActivity : ComponentActivity() {
                             onNavigateToOnboarding = {
                                 currentScreen = Screen.Onboarding
                             },
+                            onThemeChanged = { theme ->
+                                isDarkTheme = theme
+                            },
                             modifier = Modifier.fillMaxSize()
                         )
-                        // Trigger dynamic recompose of theme if toggled inside HomeScreen
-                        isDarkTheme = repository.isDarkTheme()
                     }
                     Screen.Playback -> {
                         activeFile?.let { file ->

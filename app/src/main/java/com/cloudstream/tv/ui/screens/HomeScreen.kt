@@ -98,6 +98,7 @@ fun HomeScreen(
     onPlayVideo: (DriveFile, List<DriveFile>) -> Unit,
     onStartSlideshow: (DriveFile, List<DriveFile>) -> Unit,
     onNavigateToOnboarding: () -> Unit,
+    onThemeChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -656,7 +657,7 @@ fun HomeScreen(
                         onSelect = {
                             isDarkTheme = !isDarkTheme
                             repository.setDarkTheme(isDarkTheme)
-                            // Restart or recompose theme
+                            onThemeChanged(isDarkTheme)
                         },
                         isExpanded = isSidebarExpanded
                     )
