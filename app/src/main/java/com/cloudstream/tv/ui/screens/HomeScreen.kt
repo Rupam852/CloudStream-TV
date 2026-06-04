@@ -1020,7 +1020,11 @@ fun GoogleLoginOverlay(
                         }
                     } else {
                         val qrCodeUrl = remember(verificationUrl, userCode) {
-                            val qrUrl = "${verificationUrl.ifBlank { "https://www.google.com/device" }}?user_code=$userCode"
+                            val qrUrl = if (verificationUrl.contains("google.com")) {
+                                "${verificationUrl.ifBlank { "https://www.google.com/device" }}?user_code=$userCode"
+                            } else {
+                                verificationUrl
+                            }
                             "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${java.net.URLEncoder.encode(qrUrl, "UTF-8")}"
                         }
 

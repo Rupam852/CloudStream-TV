@@ -38,7 +38,10 @@ app.get('/api/session', (req, res) => {
 
 // Endpoint 2: Phone scans QR code and hits this to redirect to Google
 app.get('/api/login', (req, res) => {
-    const sessionId = req.query.session;
+    let sessionId = req.query.session;
+    if (sessionId && typeof sessionId === 'string') {
+        sessionId = sessionId.split(/[?&]/)[0].trim();
+    }
     if (!sessionId || !sessions.has(sessionId)) {
         return res.status(400).send('Invalid or expired login session. Please close the login screen on your TV and open it again.');
     }
@@ -132,7 +135,10 @@ app.get('/api/callback', async (req, res) => {
 
 // Endpoint 4: TV app polls this endpoint
 app.get('/api/poll', (req, res) => {
-    const sessionId = req.query.session;
+    let sessionId = req.query.session;
+    if (sessionId && typeof sessionId === 'string') {
+        sessionId = sessionId.split(/[?&]/)[0].trim();
+    }
     if (!sessionId || !sessions.has(sessionId)) {
         return res.json({ status: 'expired' });
     }
