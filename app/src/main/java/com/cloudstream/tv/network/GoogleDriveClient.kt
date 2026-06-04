@@ -468,7 +468,7 @@ object GoogleDriveClient {
     const val DEFAULT_CLIENT_SECRET = "GOCSPX-cJHHY0" + "o_AWGVsNVIsAjcD5XKdOs5"
 
     // Render Backend Server Base URL. Replace this with your actual Render service URL!
-    const val BACKEND_URL = "https://cloudstream-tv-backend.onrender.com"
+    const val BACKEND_URL = "https://cloudstream-tv.onrender.com"
 
     suspend fun requestDeviceCode(clientId: String): DeviceCodeResponse = withContext(Dispatchers.IO) {
         val request = Request.Builder()
