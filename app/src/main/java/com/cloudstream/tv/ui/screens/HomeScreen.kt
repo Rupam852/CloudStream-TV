@@ -70,12 +70,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.tv.foundation.lazy.grid.TvGridCells
-import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
-import androidx.tv.foundation.lazy.grid.items
-import androidx.tv.foundation.lazy.list.TvLazyColumn
-import androidx.tv.foundation.lazy.list.items
-import androidx.tv.foundation.lazy.list.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -450,8 +449,8 @@ fun HomeScreen(
                         } else {
                             // Layout choice: Grid vs List
                             if (isGridView) {
-                                TvLazyVerticalGrid(
-                                    columns = TvGridCells.Adaptive(150.dp),
+                                LazyVerticalGrid(
+                                    columns = GridCells.Adaptive(150.dp),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(16.dp),
                                     contentPadding = PaddingValues(bottom = 24.dp)
@@ -513,7 +512,7 @@ fun HomeScreen(
                                 }
                             } else {
                                 // List View Layout
-                                TvLazyColumn(
+                                LazyColumn(
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                     contentPadding = PaddingValues(bottom = 24.dp)
                                 ) {
@@ -642,7 +641,7 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Dynamic folder switching items
-                    TvLazyColumn(
+                    LazyColumn(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -1336,8 +1335,14 @@ fun ExitDialogOverlay(
                 ) {
                     TVFocusableItem(
                         onClick = {
-                            val activity = context as? android.app.Activity
-                            activity?.finishAndRemoveTask()
+                            var ctx = context
+                            while (ctx is android.content.ContextWrapper) {
+                                if (ctx is android.app.Activity) {
+                                    ctx.finishAndRemoveTask()
+                                    break
+                                }
+                                ctx = ctx.baseContext
+                            }
                         },
                         shape = RoundedCornerShape(8.dp)
                     ) { isFocused ->
