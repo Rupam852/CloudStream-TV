@@ -375,7 +375,7 @@ fun TVWideCard(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalTvMaterial3Api::class)
 @Composable
 fun TVSidebarItem(
     title: String,
@@ -383,7 +383,8 @@ fun TVSidebarItem(
     isSelected: Boolean,
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
-    isExpanded: Boolean = true
+    isExpanded: Boolean = true,
+    onLongSelect: (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -410,8 +411,20 @@ fun TVSidebarItem(
         label = "sidebarBorder"
     )
 
-    Row(
-        modifier = modifier
+    val itemModifier = if (onLongSelect != null) {
+        modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(backgroundBrush)
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onSelect,
+                onLongClick = onLongSelect
+            )
+    } else {
+        modifier
             .fillMaxWidth()
             .height(48.dp)
             .clip(RoundedCornerShape(8.dp))
@@ -421,6 +434,10 @@ fun TVSidebarItem(
                 indication = null,
                 onClick = onSelect
             )
+    }
+
+    Row(
+        modifier = itemModifier
             .drawBehind {
                 if (isFocused) {
                     drawRoundRect(

@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
@@ -265,7 +266,15 @@ fun HomeScreen(
                                     loadFolder(folder.id)
                                     Toast.makeText(context, "Switched to: ${folder.name}", Toast.LENGTH_SHORT).show()
                                 },
-                                isExpanded = isSidebarExpanded
+                                isExpanded = isSidebarExpanded,
+                                onLongSelect = {
+                                    repository.deleteLink(folder.id)
+                                    savedFolders.clear()
+                                    savedFolders.addAll(repository.getSavedLinks())
+                                    selectedFolderId = repository.getLastSelectedFolderId()
+                                    currentFolderId = selectedFolderId
+                                    Toast.makeText(context, "Removed: ${folder.name}", Toast.LENGTH_SHORT).show()
+                                }
                             )
                         }
                     }
@@ -300,6 +309,26 @@ fun HomeScreen(
                         onSelect = {
                             isGridView = !isGridView
                             repository.setGridView(isGridView)
+                        },
+                        isExpanded = isSidebarExpanded
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    TVSidebarItem(
+                        title = "Logout",
+                        icon = Icons.Default.ExitToApp,
+                        isSelected = false,
+                        onSelect = {
+                            // Reset credentials
+                            repository.clearOAuthTokens()
+                            // Delete all saved links
+                            repository.getSavedLinks().forEach { repository.deleteLink(it.id) }
+                            // Clear history
+                            repository.clearRecentlyViewed()
+                            // Navigate to welcome onboarding screen
+                            onNavigateToOnboarding()
+                            Toast.makeText(context, "Logged out and reset successfully!", Toast.LENGTH_SHORT).show()
                         },
                         isExpanded = isSidebarExpanded
                     )
@@ -338,13 +367,43 @@ fun HomeScreen(
 
                     // "Recently Viewed" Shelf (if present)
                     if (recentlyViewedList.isNotEmpty() && currentFolderId == selectedFolderId && searchQuery.isBlank()) {
-                        Text(
-                            text = "Recently Streamed",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Recently Streamed",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            
+                            TVFocusableItem(
+                                onClick = {
+                                    repository.clearRecentlyViewed()
+                                    recentlyViewedList = emptyList()
+                                    Toast.makeText(context, "History cleared successfully!", Toast.LENGTH_SHORT).show()
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            ) { isFocused ->
+                                Text(
+                                    text = "Clear History",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isFocused) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.error,
+                                    modifier = Modifier
+                                        .background(
+                                            if (isFocused) MaterialTheme.colorScheme.errorContainer
+                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             contentPadding = PaddingValues(bottom = 16.dp)

@@ -60,7 +60,21 @@ class DriveRepository(context: Context) {
         val json = prefs.getString(KEY_RECENTLY_VIEWED, null) ?: return emptyList()
         return try {
             val type = object : TypeToken<List<DriveFile>>() {}.type
-            gson.fromJson(json, type) ?: emptyList()
+            val rawList: List<DriveFile> = gson.fromJson(json, type) ?: emptyList()
+            
+            // Filter out items viewed more than 24 hours ago (86,400,000 ms)
+            val now = System.currentTimeMillis()
+            val filtered = rawList.filter { file ->
+                val time = file.timestamp ?: now
+                now - time <= 86400000L
+            }
+            
+            // Persist the cleaned list if any expired items were removed
+            if (filtered.size != rawList.size) {
+                prefs.edit().putString(KEY_RECENTLY_VIEWED, gson.toJson(filtered)).apply()
+            }
+            
+            filtered
         } catch (e: Exception) {
             emptyList()
         }
@@ -70,7 +84,10 @@ class DriveRepository(context: Context) {
         val current = getRecentlyViewed().toMutableList()
         // Remove if already exists to push to front
         current.removeAll { it.id == file.id }
-        current.add(0, file)
+        
+        // Add current timestamp for 24h auto-expiry calculation
+        val fileWithTimestamp = file.copy(timestamp = System.currentTimeMillis())
+        current.add(0, fileWithTimestamp)
         
         // Cap list size to 20
         if (current.size > 20) {

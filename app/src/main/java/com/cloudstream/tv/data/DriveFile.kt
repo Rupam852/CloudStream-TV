@@ -8,7 +8,8 @@ data class DriveFile(
     val mimeType: String,
     val size: Long? = null,
     val isFolder: Boolean = false,
-    val thumbnailUrl: String? = null
+    val thumbnailUrl: String? = null,
+    val timestamp: Long? = null
 ) : Serializable {
     val streamUrl: String
         get() = if (id.startsWith("http://") || id.startsWith("https://")) id else "https://drive.google.com/uc?id=$id&export=download"
