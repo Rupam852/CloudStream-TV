@@ -1,0 +1,323 @@
+package com.cloudstream.tv.ui.screens
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
+import com.cloudstream.tv.R
+import com.cloudstream.tv.data.DriveLink
+import com.cloudstream.tv.data.DriveRepository
+import com.cloudstream.tv.network.GoogleDriveClient
+import com.cloudstream.tv.ui.components.TVFocusableItem
+import com.cloudstream.tv.ui.components.TVSearchBar
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+sealed class ValidationState {
+    object Idle : ValidationState()
+    object Validating : ValidationState()
+    object Success : ValidationState()
+    data class Error(val message: String) : ValidationState()
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+fun OnboardingScreen(
+    repository: DriveRepository,
+    onOnboardingComplete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var urlInput by remember { mutableStateOf("") }
+    var folderNameInput by remember { mutableStateOf("") }
+    var validationState by remember { mutableStateOf<ValidationState>(ValidationState.Idle) }
+    var showGoogleLoginDialog by remember { mutableStateOf(false) }
+    
+    val coroutineScope = rememberCoroutineScope()
+    
+    val inputFocusRequester = remember { FocusRequester() }
+    val nameFocusRequester = remember { FocusRequester() }
+    val validateFocusRequester = remember { FocusRequester() }
+
+    // Auto-focus input on launch
+    LaunchedEffect(Unit) {
+        delayMillis(500)
+        inputFocusRequester.requestFocus()
+    }
+
+    fun startValidation(url: String, customName: String) {
+        if (url.isBlank()) {
+            validationState = ValidationState.Error("Please enter a link or folder ID.")
+            return
+        }
+
+        validationState = ValidationState.Validating
+        coroutineScope.launch {
+            val folderId = GoogleDriveClient.extractFolderId(url)
+            if (folderId == null) {
+                validationState = ValidationState.Error("Invalid URL. Could not extract folder ID.")
+                return@launch
+            }
+
+            val isValid = withContext(Dispatchers.IO) {
+                val oauthToken = repository.getAccessToken()
+                GoogleDriveClient.validateFolder(folderId, repository.getApiKey(), oauthToken)
+            }
+
+            if (isValid) {
+                val finalName = customName.ifBlank {
+                    if (folderId == "demo-videos") "Demo Videos"
+                    else if (folderId == "demo-photos") "Demo Photos"
+                    else "Drive Folder (${folderId.take(6)}...)"
+                }
+                val link = DriveLink(
+                    id = folderId,
+                    name = finalName,
+                    url = url
+                )
+                repository.saveLink(link)
+                repository.setLastSelectedFolderId(folderId)
+                validationState = ValidationState.Success
+                
+                // Wait briefly for visual feedback
+                kotlinx.coroutines.delay(1000)
+                onOnboardingComplete()
+            } else {
+                validationState = ValidationState.Error(
+                    if (repository.getApiKey().isNullOrBlank())
+                        "Could not access folder. Verify that anyone with the link can view it, or try adding a Google API Key in Settings."
+                    else
+                        "Could not access folder. Verify folder ID and API Key."
+                )
+            }
+        }
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(48.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Left Side: Brand and instructions
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.app_icon),
+                contentDescription = "CloudStream TV Logo",
+                modifier = Modifier.size(120.dp)
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "Welcome to CloudStream TV",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Stream videos, play slideshows, and browse documents directly from your public Google Drive folders.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                modifier = Modifier.padding(horizontal = 24.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
+
+        // Vertical divider
+        Spacer(
+            modifier = Modifier
+                .width(1.dp)
+                .fillMaxHeight()
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(vertical = 24.dp)
+        )
+
+        // Right Side: Input & Controls
+        Column(
+            modifier = Modifier
+                .weight(1.2f)
+                .fillMaxHeight()
+                .padding(start = 48.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Link Google Drive Folder",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = "Enter a public folder link or choose a sample to start.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Folder URL Input
+            Text(
+                text = "Google Drive Folder URL or ID",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            TVSearchBar(
+                value = urlInput,
+                onValueChange = { urlInput = it },
+                focusRequester = inputFocusRequester,
+                onSearchAction = { nameFocusRequester.requestFocus() }
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Folder Name Input
+            Text(
+                text = "Folder Nickname (Optional)",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            TVSearchBar(
+                value = folderNameInput,
+                onValueChange = { folderNameInput = it },
+                focusRequester = nameFocusRequester,
+                onSearchAction = { validateFocusRequester.requestFocus() }
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Actions row (Link Folder & Google Authenticate button)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TVFocusableItem(
+                    onClick = {
+                        if (urlInput.isBlank()) {
+                            validationState = ValidationState.Error("Please enter a link or folder ID.")
+                            return@TVFocusableItem
+                        }
+                        if (repository.isLoggedIn()) {
+                            startValidation(urlInput, folderNameInput)
+                        } else {
+                            showGoogleLoginDialog = true
+                        }
+                    },
+                    modifier = Modifier.focusRequester(validateFocusRequester),
+                    shape = RoundedCornerShape(20.dp)
+                ) { isFocused ->
+                    Box(
+                        modifier = Modifier
+                            .height(40.dp)
+                            .background(
+                                if (isFocused) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                RoundedCornerShape(20.dp)
+                            )
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Link Folder & Google Authenticate",
+                            color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Validation State Indicators
+            when (val state = validationState) {
+                is ValidationState.Validating -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Text(
+                            text = "Validating link and listing files...",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+                is ValidationState.Success -> {
+                    Text(
+                        text = "✓ Folder linked successfully! Loading...",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color(0xFF10B981),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                is ValidationState.Error -> {
+                    Text(
+                        text = "✗ " + state.message,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                else -> {}
+            }
+        }
+    }
+
+    if (showGoogleLoginDialog) {
+        GoogleLoginOverlay(
+            repository = repository,
+            onDismiss = { showGoogleLoginDialog = false },
+            onLoginSuccess = {
+                showGoogleLoginDialog = false
+                startValidation(urlInput, folderNameInput)
+            }
+        )
+    }
+}
+
+// Simple delay helper to avoid handler overhead
+private suspend fun delayMillis(ms: Long) {
+    kotlinx.coroutines.delay(ms)
+}

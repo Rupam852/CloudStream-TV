@@ -1,0 +1,13 @@
+{
+  "name": "cloudstream-tv-backend",
+  "version": "1.0.0",
+  "description": "Google OAuth 2.0 Web Login Bridge for CloudStream TV",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "express": "^4.19.2"
+  }
+}
