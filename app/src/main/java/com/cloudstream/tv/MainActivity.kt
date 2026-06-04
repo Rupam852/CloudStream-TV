@@ -93,6 +93,7 @@ class MainActivity : ComponentActivity() {
                             PlaybackScreen(
                                 currentFile = file,
                                 playlist = mediaPlaylist,
+                                repository = repository,
                                 onBack = {
                                     currentScreen = Screen.Home
                                 },
@@ -105,6 +106,7 @@ class MainActivity : ComponentActivity() {
                             SlideshowScreen(
                                 currentFile = file,
                                 photos = mediaPlaylist,
+                                repository = repository,
                                 onBack = {
                                     currentScreen = Screen.Home
                                 },

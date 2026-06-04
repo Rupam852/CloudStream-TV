@@ -54,7 +54,10 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.cloudstream.tv.data.DriveFile
+import com.cloudstream.tv.data.DriveRepository
 import com.cloudstream.tv.ui.components.TVFocusableItem
 import kotlinx.coroutines.delay
 
@@ -63,6 +66,7 @@ import kotlinx.coroutines.delay
 fun SlideshowScreen(
     currentFile: DriveFile,
     photos: List<DriveFile>,
+    repository: DriveRepository,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -73,6 +77,13 @@ fun SlideshowScreen(
 
     var activeIndex by remember { mutableIntStateOf(photos.indexOfFirst { it.id == currentFile.id }.coerceAtLeast(0)) }
     val activePhoto = remember(activeIndex) { photos.getOrNull(activeIndex) ?: currentFile }
+    var oauthToken by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(activePhoto) {
+        if (repository.isLoggedIn()) {
+            oauthToken = repository.getAccessToken()
+        }
+    }
 
     var isPlaying by remember { mutableStateOf(true) }
     var intervalSeconds by remember { mutableIntStateOf(5) } // default 5 seconds
@@ -174,8 +185,21 @@ fun SlideshowScreen(
             modifier = Modifier.fillMaxSize(),
             label = "photoFade"
         ) { photo ->
+            val context = LocalContext.current
+            val imageModel = remember(photo, oauthToken) {
+                val token = oauthToken
+                if (token != null && !photo.id.startsWith("http")) {
+                    ImageRequest.Builder(context)
+                        .data("https://www.googleapis.com/drive/v3/files/${photo.id}?alt=media")
+                        .setHeader("Authorization", "Bearer $token")
+                        .crossfade(true)
+                        .build()
+                } else {
+                    photo.streamUrl
+                }
+            }
             AsyncImage(
-                model = photo.streamUrl,
+                model = imageModel,
                 contentDescription = photo.name,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()

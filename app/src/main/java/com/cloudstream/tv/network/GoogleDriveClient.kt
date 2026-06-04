@@ -54,9 +54,12 @@ object GoogleDriveClient {
         }
     }
 
-    suspend fun resolveDriveDirectUrl(fileId: String): String = withContext(Dispatchers.IO) {
+    suspend fun resolveDriveDirectUrl(fileId: String, oauthToken: String? = null): String = withContext(Dispatchers.IO) {
         if (fileId.startsWith("http")) {
             return@withContext fileId
+        }
+        if (!oauthToken.isNullOrBlank()) {
+            return@withContext "https://www.googleapis.com/drive/v3/files/$fileId?alt=media"
         }
         val initialUrl = "https://drive.google.com/uc?export=download&id=$fileId"
         val request = Request.Builder()

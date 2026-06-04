@@ -64,8 +64,11 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.cloudstream.tv.data.DriveFile
+import com.cloudstream.tv.data.DriveRepository
 import com.cloudstream.tv.network.GoogleDriveClient
 import com.cloudstream.tv.ui.components.TVFocusableItem
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -75,6 +78,7 @@ import java.util.Locale
 fun PlaybackScreen(
     currentFile: DriveFile,
     playlist: List<DriveFile>,
+    repository: DriveRepository,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -97,6 +101,7 @@ fun PlaybackScreen(
     var isResolving by remember { mutableStateOf(false) }
     var isBuffering by remember { mutableStateOf(false) }
     var resolvedUrl by remember { mutableStateOf<String?>(null) }
+    var oauthToken by remember { mutableStateOf<String?>(null) }
     
     var controlsVisible by remember { mutableStateOf(true) }
     var userActivityTrigger by remember { mutableStateOf(0L) }
@@ -110,16 +115,28 @@ fun PlaybackScreen(
     LaunchedEffect(activeFile) {
         isResolving = true
         resolvedUrl = null
-        val url = GoogleDriveClient.resolveDriveDirectUrl(activeFile.id)
+        val token = if (repository.isLoggedIn()) repository.getAccessToken() else null
+        oauthToken = token
+        val url = GoogleDriveClient.resolveDriveDirectUrl(activeFile.id, token)
         resolvedUrl = url
         isResolving = false
     }
 
     // Load active file into player when resolved URL is ready
-    LaunchedEffect(resolvedUrl) {
+    LaunchedEffect(resolvedUrl, oauthToken) {
         val url = resolvedUrl ?: return@LaunchedEffect
         val mediaItem = MediaItem.fromUri(url)
-        exoPlayer.setMediaItem(mediaItem)
+        val token = oauthToken
+        if (token != null && url.contains("googleapis.com")) {
+            val dataSourceFactory = DefaultHttpDataSource.Factory().apply {
+                setDefaultRequestProperties(mapOf("Authorization" to "Bearer $token"))
+            }
+            val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(mediaItem)
+            exoPlayer.setMediaSource(mediaSource)
+        } else {
+            exoPlayer.setMediaItem(mediaItem)
+        }
         exoPlayer.prepare()
         exoPlayer.play()
         isPlaying = true
