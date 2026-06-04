@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - CloudStream TV</title>
+    <meta name="description" content="Official Privacy Policy for CloudStream TV Android TV app. Learn how we handle your Google Drive data and credentials.">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Gradient Background -->
+    <div class="gradient-bg"></div>
+
+    <!-- Header Navigation -->
+    <header>
+        <a href="index.html" class="logo">
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM10 9l6 3-6 3V9z"/>
+                </svg>
+            </div>
+            <span class="logo-text">CloudStream TV</span>
+        </a>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="index.html#features">Features</a>
+            <a href="index.html#guide">How to Install</a>
+        </nav>
+    </header>
+
+    <!-- Privacy Content Container -->
+    <main class="privacy-container">
+        <h1 class="privacy-title">Privacy Policy</h1>
+        <div class="privacy-meta">Last Updated: June 5, 2026</div>
+
+        <section class="privacy-section">
+            <p>
+                At CloudStream TV, we are committed to protecting your privacy. This Privacy Policy explains how CloudStream TV handles data, permissions, and credentials when you use our Android TV application.
+            </p>
+        </section>
+
+        <section class="privacy-section">
+            <h3>1. Personal Information Collection</h3>
+            <p>
+                **CloudStream TV does not collect, harvest, or store any personal data.** 
+                Our application is designed as a client-side utility. We do not use external analytics packages, and we do not maintain user databases on our servers.
+            </p>
+        </section>
+
+        <section class="privacy-section">
+            <h3>2. Google Drive Permissions & Scopes</h3>
+            <p>
+                To browse and play media files, the app requests the following Google OAuth scope:
+            </p>
+            <ul>
+                <li>**`https://www.googleapis.com/auth/drive.readonly`**: This allows the app to read directory structures and obtain media streaming endpoints from folders you choose. It does not allow modifying, deleting, or editing any of your Google Drive contents.</li>
+            </ul>
+        </section>
+
+        <section class="privacy-section">
+            <h3>3. OAuth Tokens & Local Storage</h3>
+            <p>
+                Any credentials (access tokens, refresh tokens, folder nicknames, and stream history) are stored **locally and securely** on your Android TV device inside encrypted private preferences (SharedPreferences).
+            </p>
+            <p>
+                These credentials never leave your TV device except when making direct requests to official Google Drive API endpoints (`googleapis.com`) to stream media.
+            </p>
+        </section>
+
+        <section class="privacy-section">
+            <h3>4. OAuth Backend Helper</h3>
+            <p>
+                Because standard TV devices lack efficient input methods, the app utilizes a helper backend bridge (`/api/session`, `/api/poll`) to complete the Google OAuth login sequence.
+            </p>
+            <ul>
+                <li>The backend holds session cache inside short-lived, transient in-memory structures.</li>
+                <li>No authentication tokens, email addresses, or session codes are stored permanently on the server.</li>
+                <li>Session tokens are deleted from the backend memory instantly once they are successfully fetched by your TV application.</li>
+            </ul>
+        </section>
+
+        <section class="privacy-section">
+            <h3>5. Children's Privacy</h3>
+            <p>
+                Since we do not collect any personal data, we do not knowingly track or capture information from children. Our app is safe for family use.
+            </p>
+        </section>
+
+        <section class="privacy-section">
+            <h3>6. Contact Us</h3>
+            <p>
+                If you have any questions or feedback regarding this Privacy Policy, please contact us at:
+            </p>
+            <p>
+                Email: <a href="mailto:cloudstreamtvsupport@gmail.com" style="color: var(--primary); text-decoration: none;">cloudstreamtvsupport@gmail.com</a>
+            </p>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-top">
+            <a href="index.html" class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM10 9l6 3-6 3V9z"/>
+                    </svg>
+                </div>
+                <span class="logo-text">CloudStream TV</span>
+            </a>
+            <div class="footer-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#features">Features</a>
+                <a href="index.html#guide">How to Install</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span>© 2026 CloudStream TV. All rights reserved.</span>
+            <span>Support: <a href="mailto:cloudstreamtvsupport@gmail.com" style="color: var(--primary); text-decoration: none;">cloudstreamtvsupport@gmail.com</a></span>
+        </div>
+    </footer>
+
+</body>
+</html>
