@@ -272,15 +272,49 @@ nav a:hover, nav a.active {
     position: relative;
 }
 
+/* Hero Interactive Mockup */
+.tv-illustration {
+    position: relative;
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+    z-index: 10;
+}
+
+.tv-glow-back {
+    position: absolute;
+    top: -15px;
+    left: -15px;
+    right: -15px;
+    bottom: -15px;
+    border-radius: 30px;
+    z-index: -1;
+    filter: blur(35px);
+    background: radial-gradient(circle, rgba(6, 182, 212, 0.4) 0%, rgba(99, 102, 241, 0.4) 50%, transparent 100%);
+    animation: ambilightAnim 8s infinite alternate ease-in-out;
+}
+
+@keyframes ambilightAnim {
+    0% {
+        transform: scale(0.95);
+        opacity: 0.75;
+        background: radial-gradient(circle, rgba(6, 182, 212, 0.45) 0%, rgba(99, 102, 241, 0.2) 60%, transparent 100%);
+    }
+    100% {
+        transform: scale(1.05);
+        opacity: 1;
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.5) 0%, rgba(6, 182, 212, 0.25) 60%, transparent 100%);
+    }
+}
+
 .tv-frame {
     width: 100%;
     max-width: 520px;
     aspect-ratio: 16 / 9;
     border-radius: 20px;
     border: 8px solid #1e293b;
-    background: #0f172a;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 
-                0 0 40px rgba(99, 102, 241, 0.2);
+    background: #070a13;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
     position: relative;
     overflow: hidden;
 }
@@ -288,41 +322,345 @@ nav a:hover, nav a.active {
 .tv-screen {
     width: 100%;
     height: 100%;
-    background: radial-gradient(circle at center, #1e1b4b 0%, #070714 100%);
+    background: #070a13;
+    position: relative;
+    overflow: hidden;
+    padding: 0;
+}
+
+.tv-ambience {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: radial-gradient(circle at 80% 20%, rgba(6, 182, 212, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.15) 0%, transparent 50%);
+    animation: tvAmbienceShift 6s infinite alternate ease-in-out;
+}
+
+@keyframes tvAmbienceShift {
+    0% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+.mock-tv-app {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    font-size: 11px;
+    color: #fff;
+    text-align: left;
+    font-family: 'Inter', sans-serif;
+}
+
+.mock-sidebar {
+    width: 44px;
+    height: 100%;
+    background: #090c15;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
     display: flex;
     flex-direction: column;
-    justify-content: center;
     align-items: center;
-    padding: 20px;
+    padding: 12px 0;
+    flex-shrink: 0;
 }
 
-.tv-screen svg {
-    width: 64px;
-    height: 64px;
-    fill: var(--primary);
-    filter: drop-shadow(0 0 10px var(--primary));
-    animation: tvPulse 3s infinite ease-in-out;
+.mock-logo {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.4);
+    border: 1px solid rgba(6, 182, 212, 0.2);
 }
 
-@keyframes tvPulse {
-    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px var(--primary)); }
-    50% { transform: scale(1.08); filter: drop-shadow(0 0 20px var(--secondary)); }
+.mock-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    align-items: center;
 }
 
-.tv-screen-text {
-    margin-top: 15px;
-    font-size: 1.1rem;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    background: linear-gradient(to right, #fff, var(--primary));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+.mock-nav-item {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    transition: var(--transition);
 }
 
-.tv-screen-sub {
-    font-size: 0.75rem;
+.mock-nav-item.active {
+    color: var(--primary);
+    background: rgba(6, 182, 212, 0.12);
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.15);
+}
+
+.mock-nav-item svg {
+    width: 13px;
+    height: 13px;
+}
+
+.mock-main {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    position: relative;
+    overflow: hidden;
+}
+
+.mock-app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    padding-bottom: 6px;
+}
+
+.mock-folder-name {
+    font-size: 9.5px;
+    font-weight: 600;
     color: var(--text-muted);
-    margin-top: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mock-badge {
+    font-size: 7px;
+    text-transform: uppercase;
+    color: var(--primary);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 700;
+    background: rgba(6, 182, 212, 0.08);
+    letter-spacing: 0.5px;
+}
+
+.mock-content-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.mock-grid-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+    font-size: 7.5px;
+}
+
+.mock-item-preview {
+    aspect-ratio: 16/9;
+    border-radius: 6px;
+    background: rgba(20, 26, 46, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    transition: var(--transition);
+}
+
+.mock-item-preview svg {
+    width: 18px;
+    height: 18px;
+    color: #475569;
+}
+
+.mock-grid-item.focused .mock-item-preview {
+    border-color: var(--primary);
+    box-shadow: 0 0 12px rgba(6, 182, 212, 0.4);
+    background: rgba(6, 182, 212, 0.05);
+    transform: scale(1.04);
+}
+
+.mock-grid-item.focused .mock-item-name {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.mock-item-name {
+    color: #64748b;
+    font-size: 7.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: var(--transition);
+}
+
+.video-preview svg {
+    color: var(--primary);
+    z-index: 2;
+    filter: drop-shadow(0 0 4px var(--primary));
+}
+
+.folder-preview svg {
+    width: 20px;
+    height: 20px;
+}
+
+.image-preview svg {
+    color: var(--secondary);
+}
+
+.mock-pulse-ring {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(6, 182, 212, 0.4);
+    animation: mockPulseRing 2s infinite ease-out;
+}
+
+@keyframes mockPulseRing {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(3.5); opacity: 0; }
+}
+
+.mock-playing-overlay {
+    position: absolute;
+    bottom: 4px;
+    right: 6px;
+    display: flex;
+    gap: 1.5px;
+    height: 8px;
+    align-items: flex-end;
+    z-index: 2;
+}
+
+.mock-playing-overlay .bar {
+    width: 1.5px;
+    background: var(--primary);
+    height: 100%;
+    border-radius: 0.5px;
+    animation: mockEqBar 1.2s infinite ease-in-out;
+    transform-origin: bottom;
+}
+
+.mock-playing-overlay .bar-1 {
+    animation-delay: 0.1s;
+    height: 50%;
+}
+
+.mock-playing-overlay .bar-2 {
+    animation-delay: 0.4s;
+    height: 90%;
+}
+
+.mock-playing-overlay .bar-3 {
+    animation-delay: 0.2s;
+    height: 30%;
+}
+
+@keyframes mockEqBar {
+    0%, 100% { transform: scaleY(0.35); }
+    50% { transform: scaleY(1); }
+}
+
+.mock-player-hud {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(9, 12, 21, 0.95);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    border-radius: 8px;
+    padding: 6px 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+    margin-top: auto;
+}
+
+.mock-hud-play {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #070a13;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px rgba(6, 182, 212, 0.4);
+}
+
+.mock-hud-play svg {
+    width: 9px;
+    height: 9px;
+    fill: currentColor;
+}
+
+.mock-hud-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    overflow: hidden;
+}
+
+.mock-hud-title {
+    font-size: 7.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #fff;
+}
+
+.mock-progress-container {
+    width: 100%;
+    height: 3px;
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.mock-progress-track {
+    width: 100%;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 1px;
+    position: relative;
+}
+
+.mock-progress-fill {
+    width: 74%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--secondary), var(--primary));
+    border-radius: 1px;
+}
+
+.mock-progress-pin {
+    position: absolute;
+    left: 74%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 4.5px;
+    height: 4.5px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 5px var(--primary);
+}
+
+.mock-hud-time {
+    font-size: 7px;
+    color: var(--text-muted);
+    font-family: monospace;
+    flex-shrink: 0;
 }
 
 .tv-stand {
@@ -343,6 +681,58 @@ nav a:hover, nav a.active {
     border-radius: 3px;
     position: relative;
     top: -2px;
+}
+
+@media (max-width: 480px) {
+    .mock-tv-app {
+        font-size: 8.5px;
+    }
+    .mock-sidebar {
+        width: 32px;
+        padding: 8px 0;
+    }
+    .mock-logo {
+        width: 16px;
+        height: 16px;
+        margin-bottom: 12px;
+    }
+    .mock-nav-item {
+        width: 20px;
+        height: 20px;
+    }
+    .mock-nav-item svg {
+        width: 10px;
+        height: 10px;
+    }
+    .mock-main {
+        padding: 8px;
+    }
+    .mock-app-header {
+        margin-bottom: 6px;
+    }
+    .mock-content-grid {
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+    .mock-item-preview svg {
+        width: 14px;
+        height: 14px;
+    }
+    .folder-preview svg {
+        width: 16px;
+        height: 16px;
+    }
+    .mock-player-hud {
+        padding: 4px 8px;
+    }
+    .mock-hud-play {
+        width: 12px;
+        height: 12px;
+    }
+    .mock-hud-play svg {
+        width: 7px;
+        height: 7px;
+    }
 }
 
 /* Sections General */

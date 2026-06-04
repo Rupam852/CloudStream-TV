@@ -64,13 +64,86 @@
             
             <div class="hero-visual">
                 <div class="tv-illustration">
+                    <div class="tv-glow-back"></div>
                     <div class="tv-frame">
                         <div class="tv-screen">
-                            <svg viewBox="0 0 24 24">
-                                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM10 9l6 3-6 3V9z"/>
-                            </svg>
-                            <div class="tv-screen-text">CloudStream TV</div>
-                            <div class="tv-screen-sub">ExoPlayer Engine Running</div>
+                            <div class="tv-ambience"></div>
+                            <div class="mock-tv-app">
+                                <!-- Sidebar Navigation -->
+                                <aside class="mock-sidebar">
+                                    <img src="logo.png" alt="App Logo" class="mock-logo">
+                                    <nav class="mock-nav">
+                                        <div class="mock-nav-item active">
+                                            <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" fill="currentColor"/></svg>
+                                        </div>
+                                        <div class="mock-nav-item">
+                                            <svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z" fill="currentColor"/></svg>
+                                        </div>
+                                        <div class="mock-nav-item">
+                                            <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z" fill="currentColor"/></svg>
+                                        </div>
+                                        <div class="mock-nav-item">
+                                            <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" fill="currentColor"/></svg>
+                                        </div>
+                                    </nav>
+                                </aside>
+                                
+                                <!-- Main Panel -->
+                                <div class="mock-main">
+                                    <!-- Header section of active screen -->
+                                    <div class="mock-app-header">
+                                        <span class="mock-folder-name">Google Drive / Movies & Photos</span>
+                                        <span class="mock-badge">Active</span>
+                                    </div>
+                                    
+                                    <!-- Dynamic UI content (grid of folders/files) -->
+                                    <div class="mock-content-grid">
+                                        <div class="mock-grid-item">
+                                            <div class="mock-item-preview folder-preview">
+                                                <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" fill="#ffb300"/></svg>
+                                            </div>
+                                            <span class="mock-item-name">Family Videos</span>
+                                        </div>
+                                        
+                                        <div class="mock-grid-item focused">
+                                            <div class="mock-item-preview video-preview">
+                                                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+                                                <div class="mock-pulse-ring"></div>
+                                                <div class="mock-playing-overlay">
+                                                    <span class="bar bar-1"></span>
+                                                    <span class="bar bar-2"></span>
+                                                    <span class="bar bar-3"></span>
+                                                </div>
+                                            </div>
+                                            <span class="mock-item-name">ExoPlayer Active</span>
+                                        </div>
+                                        
+                                        <div class="mock-grid-item">
+                                            <div class="mock-item-preview image-preview">
+                                                <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" fill="currentColor"/></svg>
+                                            </div>
+                                            <span class="mock-item-name">Nature_Show.jpg</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Video Player Overlay Hud when active -->
+                                    <div class="mock-player-hud">
+                                        <div class="mock-hud-play">
+                                            <svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"/></svg>
+                                        </div>
+                                        <div class="mock-hud-info">
+                                            <div class="mock-hud-title">SciFi_Space_Travel_4K.mp4</div>
+                                            <div class="mock-progress-container">
+                                                <div class="mock-progress-track">
+                                                    <div class="mock-progress-fill"></div>
+                                                    <div class="mock-progress-pin"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mock-hud-time">02:14 / 03:00</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="tv-stand"></div>
