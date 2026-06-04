@@ -2,6 +2,9 @@
 
 CloudStream TV is a premium, native Android TV application built using **Kotlin** and **Jetpack Compose for TV**. It is designed specifically for television screens to stream videos and display photo slideshows directly from **Google Drive** folders using either a public scraper or secure Google OAuth 2.0 Device flow.
 
+> [!IMPORTANT]
+> **Target Platform**: This application is built and optimized exclusively for **Android TV** and **Google TV** devices. It requires a D-pad remote control, keyboard, or equivalent controller to navigate the user interface.
+
 ---
 
 ## 📺 Key Features
