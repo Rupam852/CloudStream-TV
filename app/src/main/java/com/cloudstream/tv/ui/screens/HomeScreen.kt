@@ -44,6 +44,8 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -123,6 +125,9 @@ fun HomeScreen(
     
     // Search & Filter
     var searchQuery by remember { mutableStateOf("") }
+
+    // Active folder for Rename/Remove options dialog
+    var folderOptionsActiveFolder by remember { mutableStateOf<DriveLink?>(null) }
     
     // Backdrop blur representation with debouncing to eliminate fast-scrolling network load stutter
     var targetBackdropUrl by remember { mutableStateOf<String?>(null) }
@@ -221,12 +226,14 @@ fun HomeScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(start = 64.dp) // Always reserve 64.dp for the collapsed sidebar
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                        .padding(top = 16.dp, bottom = 16.dp)
                 ) {
                     // Header / Active Folder Title
                     val currentFolderTitle = savedFolders.find { it.id == selectedFolderId }?.name ?: "CloudStream TV"
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
@@ -252,6 +259,7 @@ fun HomeScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
                                 .padding(bottom = 8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -288,7 +296,13 @@ fun HomeScreen(
                         }
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            contentPadding = PaddingValues(bottom = 16.dp)
+                            contentPadding = PaddingValues(
+                                start = 24.dp,
+                                end = 24.dp,
+                                top = 12.dp,
+                                bottom = 24.dp
+                            ),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             items(recentlyViewedList) { file ->
                                 val icon = if (file.isVideo) Icons.Default.Movie else Icons.Default.Image
@@ -302,6 +316,8 @@ fun HomeScreen(
                                             onPlayVideo(file, listOf(file))
                                         } else if (file.isImage) {
                                             onStartSlideshow(file, listOf(file))
+                                        } else {
+                                            Toast.makeText(context, "File streaming not supported", Toast.LENGTH_SHORT).show()
                                         }
                                     },
                                     onLongClick = {
@@ -319,7 +335,7 @@ fun HomeScreen(
                     }
 
                     // Main items view
-                    Box(modifier = Modifier.weight(1f)) {
+                    Box(modifier = Modifier.weight(1f).padding(horizontal = 24.dp)) {
                         if (isLoadingFiles) {
                             Box(
                                 modifier = Modifier.fillMaxSize(),
@@ -462,6 +478,8 @@ fun HomeScreen(
                                                     recentlyViewedList = repository.getRecentlyViewed()
                                                     // Pass list of other images in this folder for slideshow cycle
                                                     onStartSlideshow(file, filesList.filter { it.isImage })
+                                                } else {
+                                                    Toast.makeText(context, "File streaming not supported", Toast.LENGTH_SHORT).show()
                                                 }
                                             },
                                             onFocus = {
@@ -512,6 +530,8 @@ fun HomeScreen(
                                                     repository.addToRecentlyViewed(file)
                                                     recentlyViewedList = repository.getRecentlyViewed()
                                                     onStartSlideshow(file, filesList.filter { it.isImage })
+                                                } else {
+                                                    Toast.makeText(context, "File streaming not supported", Toast.LENGTH_SHORT).show()
                                                 }
                                             },
                                             onFocus = {
@@ -628,12 +648,7 @@ fun HomeScreen(
                                 },
                                 isExpanded = isSidebarExpanded,
                                 onLongSelect = {
-                                    repository.deleteLink(folder.id)
-                                    savedFolders.clear()
-                                    savedFolders.addAll(repository.getSavedLinks())
-                                    selectedFolderId = repository.getLastSelectedFolderId()
-                                    currentFolderId = selectedFolderId
-                                    Toast.makeText(context, "Removed: ${folder.name}", Toast.LENGTH_SHORT).show()
+                                    folderOptionsActiveFolder = folder
                                 }
                             )
                         }
@@ -713,6 +728,29 @@ fun HomeScreen(
             if (showExitDialog) {
                 ExitDialogOverlay(
                     onDismiss = { showExitDialog = false }
+                )
+            }
+
+            folderOptionsActiveFolder?.let { folder ->
+                FolderOptionsOverlay(
+                    folder = folder,
+                    onDismiss = { folderOptionsActiveFolder = null },
+                    onRemove = {
+                        repository.deleteLink(folder.id)
+                        savedFolders.clear()
+                        savedFolders.addAll(repository.getSavedLinks())
+                        selectedFolderId = repository.getLastSelectedFolderId()
+                        currentFolderId = selectedFolderId
+                        folderOptionsActiveFolder = null
+                        Toast.makeText(context, "Folder link removed", Toast.LENGTH_SHORT).show()
+                    },
+                    onRename = { newName ->
+                        repository.renameLink(folder.id, newName)
+                        savedFolders.clear()
+                        savedFolders.addAll(repository.getSavedLinks())
+                        folderOptionsActiveFolder = null
+                        Toast.makeText(context, "Folder renamed to: $newName", Toast.LENGTH_SHORT).show()
+                    }
                 )
             }
         }
@@ -1313,6 +1351,198 @@ fun ExitDialogOverlay(
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+fun FolderOptionsOverlay(
+    folder: DriveLink,
+    onDismiss: () -> Unit,
+    onRemove: () -> Unit,
+    onRename: (newName: String) -> Unit
+) {
+    var isRenameMode by remember { mutableStateOf(false) }
+    var newNameInput by remember { mutableStateOf(folder.name) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnClickOutside = false
+        )
+    ) {
+        val focusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) {
+            focusRequester.requestFocus()
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.8f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(400.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (!isRenameMode) {
+                    Text(
+                        text = "Folder Options",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = folder.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = CloudStreamTheme.extraColors.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    TVFocusableItem(
+                        onClick = { isRenameMode = true },
+                        modifier = Modifier.focusRequester(focusRequester),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (isFocused) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Rename Folder",
+                                color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    TVFocusableItem(
+                        onClick = onRemove,
+                        shape = RoundedCornerShape(8.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (isFocused) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Remove Link",
+                                color = if (isFocused) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    TVFocusableItem(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(8.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (isFocused) MaterialTheme.colorScheme.surfaceVariant
+                                    else Color.Transparent,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Cancel",
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "Rename Folder",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    TVSearchBar(
+                        value = newNameInput,
+                        onValueChange = { newNameInput = it },
+                        focusRequester = focusRequester
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TVFocusableItem(
+                            onClick = { isRenameMode = false },
+                            shape = RoundedCornerShape(8.dp)
+                        ) { isFocused ->
+                            Text(
+                                text = "Back",
+                                modifier = Modifier
+                                    .background(
+                                        if (isFocused) MaterialTheme.colorScheme.surfaceVariant
+                                        else Color.Transparent,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        TVFocusableItem(
+                            onClick = {
+                                if (newNameInput.isNotBlank()) {
+                                    onRename(newNameInput)
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp)
+                        ) { isFocused ->
+                            Text(
+                                text = "Save",
+                                modifier = Modifier
+                                    .background(
+                                        if (isFocused) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }

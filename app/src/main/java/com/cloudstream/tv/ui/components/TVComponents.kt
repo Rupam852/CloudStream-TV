@@ -32,6 +32,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,13 +92,38 @@ fun TVFocusableItem(
         }
     }
 
+    val coroutineScope = rememberCoroutineScope()
+    var longClickJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
     val itemModifier = if (onLongClick != null) {
-        modifier.combinedClickable(
-            interactionSource = interactionSource,
-            indication = null,
-            onClick = onClick,
-            onLongClick = onLongClick
-        )
+        modifier.onPreviewKeyEvent { keyEvent ->
+            val keyCode = keyEvent.nativeKeyEvent.keyCode
+            val action = keyEvent.nativeKeyEvent.action
+            if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+                keyCode == android.view.KeyEvent.KEYCODE_ENTER) {
+                if (action == android.view.KeyEvent.ACTION_DOWN) {
+                    if (keyEvent.nativeKeyEvent.repeatCount == 0) {
+                        longClickJob?.cancel()
+                        longClickJob = coroutineScope.launch {
+                            kotlinx.coroutines.delay(500)
+                            onLongClick()
+                        }
+                    }
+                    true
+                } else if (action == android.view.KeyEvent.ACTION_UP) {
+                    val wasActive = longClickJob?.isActive == true
+                    longClickJob?.cancel()
+                    if (wasActive) {
+                        onClick()
+                    }
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }
     } else {
         modifier
     }
@@ -332,16 +361,46 @@ fun TVSidebarItem(
         label = "sidebarBorder"
     )
 
+    val coroutineScope = rememberCoroutineScope()
+    var longClickJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
     val itemModifier = if (onLongSelect != null) {
         modifier
             .fillMaxWidth()
             .height(48.dp)
             .clip(RoundedCornerShape(8.dp))
-            .combinedClickable(
+            .onPreviewKeyEvent { keyEvent ->
+                val keyCode = keyEvent.nativeKeyEvent.keyCode
+                val action = keyEvent.nativeKeyEvent.action
+                if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+                    keyCode == android.view.KeyEvent.KEYCODE_ENTER) {
+                    if (action == android.view.KeyEvent.ACTION_DOWN) {
+                        if (keyEvent.nativeKeyEvent.repeatCount == 0) {
+                            longClickJob?.cancel()
+                            longClickJob = coroutineScope.launch {
+                                kotlinx.coroutines.delay(500)
+                                onLongSelect()
+                            }
+                        }
+                        true
+                    } else if (action == android.view.KeyEvent.ACTION_UP) {
+                        val wasActive = longClickJob?.isActive == true
+                        longClickJob?.cancel()
+                        if (wasActive) {
+                            onSelect()
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onSelect,
-                onLongClick = onLongSelect
+                onClick = {}
             )
     } else {
         modifier

@@ -55,6 +55,16 @@ class DriveRepository(context: Context) {
         }
     }
 
+    fun renameLink(id: String, newName: String) {
+        val current = getSavedLinks().toMutableList()
+        val index = current.indexOfFirst { it.id == id }
+        if (index != -1) {
+            val updated = current[index].copy(name = newName)
+            current[index] = updated
+            prefs.edit().putString(KEY_DRIVE_LINKS, gson.toJson(current)).apply()
+        }
+    }
+
     // --- Recently Viewed ---
     fun getRecentlyViewed(): List<DriveFile> {
         val json = prefs.getString(KEY_RECENTLY_VIEWED, null) ?: return emptyList()
