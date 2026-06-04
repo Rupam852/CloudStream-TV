@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.text.font.FontFamily
+import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
@@ -63,7 +64,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.cloudstream.tv.ui.theme.CloudStreamTheme
 
-@OptIn(ExperimentalTvMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalTvMaterial3Api::class)
 @Composable
 fun TVFocusableItem(
     onClick: () -> Unit,
@@ -73,21 +74,13 @@ fun TVFocusableItem(
     borderColor: Color = CloudStreamTheme.extraColors.focusBorder,
     shape: RoundedCornerShape = RoundedCornerShape(12.dp),
     scaleOnFocus: Float = 1.07f,
+    onLongClick: (() -> Unit)? = null,
+    containerColor: Color = Color.Transparent,
+    focusedContainerColor: Color = Color.Transparent,
     content: @Composable (isFocused: Boolean) -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
-
-    val scale by animateFloatAsState(
-        targetValue = if (isFocused) scaleOnFocus else 1.0f,
-        animationSpec = tween(durationMillis = 200),
-        label = "scale"
-    )
-    val animatedBorderColor by animateColorAsState(
-        targetValue = if (isFocused) borderColor else Color.Transparent,
-        animationSpec = tween(durationMillis = 200),
-        label = "borderColor"
-    )
 
     LaunchedEffect(isFocused) {
         if (isFocused) {
@@ -95,13 +88,24 @@ fun TVFocusableItem(
         }
     }
 
+    val itemModifier = if (onLongClick != null) {
+        modifier.combinedClickable(
+            interactionSource = interactionSource,
+            indication = null,
+            onClick = onClick,
+            onLongClick = onLongClick
+        )
+    } else {
+        modifier
+    }
+
     Surface(
-        onClick = onClick,
+        onClick = if (onLongClick != null) { {} } else onClick,
         scale = ClickableSurfaceDefaults.scale(focusedScale = scaleOnFocus),
         shape = ClickableSurfaceDefaults.shape(shape = shape),
         border = ClickableSurfaceDefaults.border(
-            border = androidx.tv.material3.Border(border = BorderStroke(1.5.dp, Color.Transparent)),
-            focusedBorder = androidx.tv.material3.Border(border = BorderStroke(2.dp, borderColor))
+            border = Border(BorderStroke(1.5.dp, Color.Transparent)),
+            focusedBorder = Border(BorderStroke(2.dp, borderColor))
         ),
         glow = ClickableSurfaceDefaults.glow(
             focusedGlow = androidx.tv.material3.Glow(
@@ -110,17 +114,17 @@ fun TVFocusableItem(
             )
         ),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = Color.Transparent,
-            focusedContainerColor = Color.Transparent
+            containerColor = containerColor,
+            focusedContainerColor = focusedContainerColor
         ),
         interactionSource = interactionSource,
-        modifier = modifier
+        modifier = itemModifier
     ) {
         content(isFocused)
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalTvMaterial3Api::class)
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun TVCard(
     title: String,
@@ -133,119 +137,77 @@ fun TVCard(
     iconTint: Color = MaterialTheme.colorScheme.primary,
     badgeText: String? = null
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
-
-    val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.06f else 1.0f,
-        animationSpec = tween(durationMillis = 200),
-        label = "scale"
-    )
-    
-    val focusColor = CloudStreamTheme.extraColors.focusBorder
-
-    LaunchedEffect(isFocused) {
-        if (isFocused) {
-            onFocus()
-        }
-    }
-
-    val cardModifier = if (onLongClick != null) {
-        modifier
-            .scale(scale)
-            .focusGroup()
-            .onFocusChanged { }
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-                onLongClick = onLongClick
-            )
-    } else {
-        modifier
-            .scale(scale)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            )
-    }
-
-    Box(
-        modifier = cardModifier
-            .width(160.dp)
-            .height(130.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (isFocused) MaterialTheme.colorScheme.surfaceVariant
-                else MaterialTheme.colorScheme.surface
-            )
-            .drawBehind {
-                if (isFocused) {
-                    drawRoundRect(
-                        color = focusColor,
-                        style = Stroke(width = 2.dp.toPx()),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx())
+    TVFocusableItem(
+        onClick = onClick,
+        onFocus = onFocus,
+        onLongClick = onLongClick,
+        modifier = modifier,
+        scaleOnFocus = 1.06f,
+        containerColor = MaterialTheme.colorScheme.surface,
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+    ) { isFocused ->
+        Box(
+            modifier = Modifier
+                .width(160.dp)
+                .height(130.dp)
+                .padding(12.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                        .align(Alignment.Start),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (isFocused) MaterialTheme.colorScheme.primary else iconTint,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
-            }
-            .padding(12.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.background)
-                    .align(Alignment.Start),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = if (isFocused) MaterialTheme.colorScheme.primary else iconTint,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            
-            Spacer(modifier = Modifier.weight(1f))
-            
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelLarge,
-                color = CloudStreamTheme.extraColors.textMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        if (badgeText != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-            ) {
+                
+                Spacer(modifier = Modifier.weight(1f))
+                
                 Text(
-                    text = badgeText,
-                    style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = CloudStreamTheme.extraColors.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            if (badgeText != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = badgeText,
+                        style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalTvMaterial3Api::class)
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun TVWideCard(
     title: String,
@@ -258,118 +220,77 @@ fun TVWideCard(
     iconTint: Color = MaterialTheme.colorScheme.primary,
     badgeText: String? = null
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
-
-    val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.05f else 1.0f,
-        animationSpec = tween(durationMillis = 200),
-        label = "scale"
-    )
-    
-    val focusColor = CloudStreamTheme.extraColors.focusBorder
-
-    LaunchedEffect(isFocused) {
-        if (isFocused) {
-            onFocus()
-        }
-    }
-
-    val cardModifier = if (onLongClick != null) {
-        modifier
-            .scale(scale)
-            .focusGroup()
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-                onLongClick = onLongClick
-            )
-    } else {
-        modifier
-            .scale(scale)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            )
-    }
-
-    Box(
-        modifier = cardModifier
-            .width(280.dp)
-            .height(86.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (isFocused) MaterialTheme.colorScheme.surfaceVariant
-                else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-            )
-            .drawBehind {
-                if (isFocused) {
-                    drawRoundRect(
-                        color = focusColor,
-                        style = Stroke(width = 1.5.dp.toPx()),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx())
+    TVFocusableItem(
+        onClick = onClick,
+        onFocus = onFocus,
+        onLongClick = onLongClick,
+        modifier = modifier,
+        scaleOnFocus = 1.05f,
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+    ) { isFocused ->
+        Box(
+            modifier = Modifier
+                .width(280.dp)
+                .height(86.dp)
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.background),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = if (badgeText != null) 48.dp else 0.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = CloudStreamTheme.extraColors.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
-            .padding(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.background),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = if (badgeText != null) 48.dp else 0.dp)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = CloudStreamTheme.extraColors.textMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-        
-        if (badgeText != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-            ) {
-                Text(
-                    text = badgeText,
-                    style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
+            
+            if (badgeText != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = badgeText,
+                        style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }
@@ -402,7 +323,7 @@ fun TVSidebarItem(
                 Color.Transparent
             )
         )
-        else -> Brush.horizontalGradient(colors = listOf(Color.Transparent, Color.Transparent))
+        else -> null
     }
 
     val animatedBorderColor by animateColorAsState(
@@ -416,7 +337,6 @@ fun TVSidebarItem(
             .fillMaxWidth()
             .height(48.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(backgroundBrush)
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -428,7 +348,6 @@ fun TVSidebarItem(
             .fillMaxWidth()
             .height(48.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(backgroundBrush)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -439,6 +358,12 @@ fun TVSidebarItem(
     Row(
         modifier = itemModifier
             .drawBehind {
+                backgroundBrush?.let {
+                    drawRoundRect(
+                        brush = it,
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx())
+                    )
+                }
                 if (isFocused) {
                     drawRoundRect(
                         color = animatedBorderColor,
@@ -499,6 +424,7 @@ fun TVSearchBar(
 
     val isVisualFocused = isFocusedBySystem || isTextFocused
     val focusBorderColor = CloudStreamTheme.extraColors.focusBorder
+    val containerColor = if (isVisualFocused) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface
 
     Box(
         modifier = modifier
@@ -510,11 +436,11 @@ fun TVSearchBar(
                 isEditing = true
             }
             .clip(RoundedCornerShape(23.dp))
-            .background(
-                if (isVisualFocused) MaterialTheme.colorScheme.surfaceVariant
-                else MaterialTheme.colorScheme.surface
-            )
             .drawBehind {
+                drawRoundRect(
+                    color = containerColor,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(23.dp.toPx())
+                )
                 if (isVisualFocused) {
                     drawRoundRect(
                         color = focusBorderColor,

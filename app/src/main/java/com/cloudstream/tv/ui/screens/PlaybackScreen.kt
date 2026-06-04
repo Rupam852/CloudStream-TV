@@ -462,16 +462,13 @@ fun PlaybackScreen(
                         TVFocusableItem(
                             onClick = { togglePlayPause() },
                             modifier = Modifier.focusRequester(playButtonFocusRequester),
-                            shape = CircleShape
+                            shape = CircleShape,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+                            focusedContainerColor = MaterialTheme.colorScheme.primary
                         ) { isFocused ->
                             Box(
                                 modifier = Modifier
-                                    .size(56.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (isFocused) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
-                                    ),
+                                    .size(56.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -518,15 +515,15 @@ fun PlaybackScreen(
                         Spacer(modifier = Modifier.width(16.dp))
 
                         // Playback Speed Toggle
-                        TVFocusableItem(onClick = { toggleSpeed() }, shape = RoundedCornerShape(8.dp)) { isFocused ->
+                        TVFocusableItem(
+                            onClick = { toggleSpeed() },
+                            shape = RoundedCornerShape(8.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+                            focusedContainerColor = MaterialTheme.colorScheme.primary
+                        ) { isFocused ->
                             Box(
                                 modifier = Modifier
                                     .height(36.dp)
-                                    .background(
-                                        if (isFocused) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
-                                        RoundedCornerShape(8.dp)
-                                    )
                                     .padding(horizontal = 12.dp, vertical = 6.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -567,16 +564,13 @@ private fun IconButton(
     TVFocusableItem(
         onClick = onClick,
         shape = CircleShape,
-        modifier = Modifier.alpha(if (enabled) 1.0f else 0.4f)
+        modifier = Modifier.alpha(if (enabled) 1.0f else 0.4f),
+        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        focusedContainerColor = MaterialTheme.colorScheme.primary
     ) { isFocused ->
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(
-                    if (isFocused) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                ),
+                .size(40.dp),
             contentAlignment = Alignment.Center
         ) {
             Icon(

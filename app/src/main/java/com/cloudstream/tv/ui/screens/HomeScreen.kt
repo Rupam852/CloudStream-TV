@@ -123,8 +123,14 @@ fun HomeScreen(
     // Search & Filter
     var searchQuery by remember { mutableStateOf("") }
     
-    // Backdrop blur representation
+    // Backdrop blur representation with debouncing to eliminate fast-scrolling network load stutter
+    var targetBackdropUrl by remember { mutableStateOf<String?>(null) }
     var backdropUrl by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(targetBackdropUrl) {
+        // Wait 350ms before updating backdrop to avoid loading while rapidly scrolling
+        kotlinx.coroutines.delay(350)
+        backdropUrl = targetBackdropUrl
+    }
     
     // Modals/Overlays
     var showAddFolderDialog by remember { mutableStateOf(false) }
@@ -193,156 +199,21 @@ fun HomeScreen(
             HomeScreenBackdrop(backdropUrlProvider = { backdropUrl })
 
             // 2. Main Row Layout: Sidebar + Content
-            Row(modifier = Modifier.fillMaxSize()) {
-                // Sidebar panel
+            // 2. Main Layout: Sidebar (Overlay) + Content (Fixed offset to avoid layout resizing recalculations)
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Sidebar panel expanded state
                 var isSidebarExpanded by remember { mutableStateOf(false) }
                 val sidebarWidth by animateFloatAsState(
                     targetValue = if (isSidebarExpanded) 220f else 64f,
-                    animationSpec = tween(200),
+                    animationSpec = tween(150),
                     label = "sidebarWidth"
                 )
 
+                // Main Content Panel (Placed first to lay out behind the sidebar overlay)
                 Column(
                     modifier = Modifier
-                        .width(sidebarWidth.dp)
-                        .fillMaxHeight()
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
-                        .padding(vertical = 16.dp, horizontal = 8.dp)
-                        .focusRequester(remember { FocusRequester() })
-                        .onFocusChanged { focusState ->
-                            isSidebarExpanded = focusState.hasFocus
-                        },
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Brand / Logo
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.background),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Folder,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Expand/Collapse Sidebar focus trigger
-                    TVFocusableItem(
-                        onClick = { isSidebarExpanded = !isSidebarExpanded },
-                        shape = RoundedCornerShape(8.dp),
-                        scaleOnFocus = 1.02f
-                    ) { isFocused ->
-                        LaunchedEffect(isFocused) {
-                            if (isFocused) isSidebarExpanded = true
-                        }
-                        TVSidebarItem(
-                            title = "Folders List",
-                            icon = Icons.Default.SwapHoriz,
-                            isSelected = false,
-                            onSelect = { isSidebarExpanded = !isSidebarExpanded },
-                            isExpanded = isSidebarExpanded
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Dynamic folder switching items
-                    TvLazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(savedFolders) { folder ->
-                            TVSidebarItem(
-                                title = folder.name,
-                                icon = Icons.Default.Folder,
-                                isSelected = currentFolderId == folder.id && selectedFolderId != "root",
-                                onSelect = {
-                                    folderNavigationStack.clear()
-                                    selectedFolderId = folder.id
-                                    currentFolderId = folder.id
-                                    repository.setLastSelectedFolderId(folder.id)
-                                    loadFolder(folder.id)
-                                    Toast.makeText(context, "Switched to: ${folder.name}", Toast.LENGTH_SHORT).show()
-                                },
-                                isExpanded = isSidebarExpanded,
-                                onLongSelect = {
-                                    repository.deleteLink(folder.id)
-                                    savedFolders.clear()
-                                    savedFolders.addAll(repository.getSavedLinks())
-                                    selectedFolderId = repository.getLastSelectedFolderId()
-                                    currentFolderId = selectedFolderId
-                                    Toast.makeText(context, "Removed: ${folder.name}", Toast.LENGTH_SHORT).show()
-                                }
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    TVSidebarItem(
-                        title = "Add Link",
-                        icon = Icons.Default.Add,
-                        isSelected = false,
-                        onSelect = { showAddFolderDialog = true },
-                        isExpanded = isSidebarExpanded
-                    )
-
-
-                    TVSidebarItem(
-                        title = if (isDarkTheme) "Light Theme" else "Dark Theme",
-                        icon = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                        isSelected = false,
-                        onSelect = {
-                            isDarkTheme = !isDarkTheme
-                            repository.setDarkTheme(isDarkTheme)
-                            // Restart or recompose theme
-                        },
-                        isExpanded = isSidebarExpanded
-                    )
-
-                    TVSidebarItem(
-                        title = if (isGridView) "List View" else "Grid View",
-                        icon = if (isGridView) Icons.Default.List else Icons.Default.GridView,
-                        isSelected = false,
-                        onSelect = {
-                            isGridView = !isGridView
-                            repository.setGridView(isGridView)
-                        },
-                        isExpanded = isSidebarExpanded
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    TVSidebarItem(
-                        title = "Logout",
-                        icon = Icons.Default.ExitToApp,
-                        isSelected = false,
-                        onSelect = {
-                            // Reset credentials
-                            repository.clearOAuthTokens()
-                            // Delete all saved links
-                            repository.getSavedLinks().forEach { repository.deleteLink(it.id) }
-                            // Clear history
-                            repository.clearRecentlyViewed()
-                            // Navigate to welcome onboarding screen
-                            onNavigateToOnboarding()
-                            Toast.makeText(context, "Logged out and reset successfully!", Toast.LENGTH_SHORT).show()
-                        },
-                        isExpanded = isSidebarExpanded
-                    )
-                }
-
-                // Main Content Panel
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
+                        .fillMaxSize()
+                        .padding(start = 64.dp) // Always reserve 64.dp for the collapsed sidebar
                         .padding(horizontal = 24.dp, vertical = 16.dp)
                 ) {
                     // Header / Active Folder Title
@@ -588,7 +459,7 @@ fun HomeScreen(
                                             },
                                             onFocus = {
                                                 // Update background image dynamic glow preview
-                                                backdropUrl = if (file.isFolder) null else file.thumbnailUrl ?: file.streamUrl
+                                                targetBackdropUrl = if (file.isFolder) null else file.thumbnailUrl ?: file.streamUrl
                                             },
                                             iconTint = if (file.isFolder) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
                                             onLongClick = if (file.isFolder) {
@@ -637,19 +508,17 @@ fun HomeScreen(
                                                 }
                                             },
                                             onFocus = {
-                                                backdropUrl = if (file.isFolder) null else file.thumbnailUrl ?: file.streamUrl
+                                                targetBackdropUrl = if (file.isFolder) null else file.thumbnailUrl ?: file.streamUrl
                                             },
                                             shape = RoundedCornerShape(8.dp),
                                             scaleOnFocus = 1.02f,
+                                            containerColor = MaterialTheme.colorScheme.surface,
+                                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                                             modifier = Modifier.fillMaxWidth()
                                         ) { isFocused ->
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .background(
-                                                        if (isFocused) MaterialTheme.colorScheme.surfaceVariant
-                                                        else MaterialTheme.colorScheme.surface
-                                                    )
                                                     .padding(horizontal = 16.dp, vertical = 12.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
@@ -679,6 +548,143 @@ fun HomeScreen(
                             }
                         }
                     }
+                }
+
+                // Sidebar overlay on top (positioned second in Box to render on top of the content)
+                Column(
+                    modifier = Modifier
+                        .width(sidebarWidth.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+                        .padding(vertical = 16.dp, horizontal = 8.dp)
+                        .focusRequester(remember { FocusRequester() })
+                        .onFocusChanged { focusState ->
+                            isSidebarExpanded = focusState.hasFocus
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Brand / Logo
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.background),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Expand/Collapse Sidebar focus trigger
+                    TVFocusableItem(
+                        onClick = { isSidebarExpanded = !isSidebarExpanded },
+                        shape = RoundedCornerShape(8.dp),
+                        scaleOnFocus = 1.02f
+                    ) { isFocused ->
+                        LaunchedEffect(isFocused) {
+                            if (isFocused) isSidebarExpanded = true
+                        }
+                        TVSidebarItem(
+                            title = "Folders List",
+                            icon = Icons.Default.SwapHoriz,
+                            isSelected = false,
+                            onSelect = { isSidebarExpanded = !isSidebarExpanded },
+                            isExpanded = isSidebarExpanded
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Dynamic folder switching items
+                    TvLazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(savedFolders) { folder ->
+                            TVSidebarItem(
+                                title = folder.name,
+                                icon = Icons.Default.Folder,
+                                isSelected = currentFolderId == folder.id && selectedFolderId != "root",
+                                onSelect = {
+                                    folderNavigationStack.clear()
+                                    selectedFolderId = folder.id
+                                    currentFolderId = folder.id
+                                    repository.setLastSelectedFolderId(folder.id)
+                                    loadFolder(folder.id)
+                                    Toast.makeText(context, "Switched to: ${folder.name}", Toast.LENGTH_SHORT).show()
+                                },
+                                isExpanded = isSidebarExpanded,
+                                onLongSelect = {
+                                    repository.deleteLink(folder.id)
+                                    savedFolders.clear()
+                                    savedFolders.addAll(repository.getSavedLinks())
+                                    selectedFolderId = repository.getLastSelectedFolderId()
+                                    currentFolderId = selectedFolderId
+                                    Toast.makeText(context, "Removed: ${folder.name}", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    TVSidebarItem(
+                        title = "Add Link",
+                        icon = Icons.Default.Add,
+                        isSelected = false,
+                        onSelect = { showAddFolderDialog = true },
+                        isExpanded = isSidebarExpanded
+                    )
+
+
+                    TVSidebarItem(
+                        title = if (isDarkTheme) "Light Theme" else "Dark Theme",
+                        icon = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                        isSelected = false,
+                        onSelect = {
+                            isDarkTheme = !isDarkTheme
+                            repository.setDarkTheme(isDarkTheme)
+                            // Restart or recompose theme
+                        },
+                        isExpanded = isSidebarExpanded
+                    )
+
+                    TVSidebarItem(
+                        title = if (isGridView) "List View" else "Grid View",
+                        icon = if (isGridView) Icons.Default.List else Icons.Default.GridView,
+                        isSelected = false,
+                        onSelect = {
+                            isGridView = !isGridView
+                            repository.setGridView(isGridView)
+                        },
+                        isExpanded = isSidebarExpanded
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    TVSidebarItem(
+                        title = "Logout",
+                        icon = Icons.Default.ExitToApp,
+                        isSelected = false,
+                        onSelect = {
+                            // Reset credentials
+                            repository.clearOAuthTokens()
+                            // Delete all saved links
+                            repository.getSavedLinks().forEach { repository.deleteLink(it.id) }
+                            // Clear history
+                            repository.clearRecentlyViewed()
+                            // Navigate to welcome onboarding screen
+                            onNavigateToOnboarding()
+                            Toast.makeText(context, "Logged out and reset successfully!", Toast.LENGTH_SHORT).show()
+                        },
+                        isExpanded = isSidebarExpanded
+                    )
                 }
             }
 
@@ -1166,7 +1172,11 @@ fun HomeScreenBackdrop(
             exit = fadeOut(animationSpec = tween(600))
         ) {
             AsyncImage(
-                model = backdropUrl,
+                model = coil.request.ImageRequest.Builder(LocalContext.current)
+                    .data(backdropUrl)
+                    .crossfade(true)
+                    .crossfade(300)
+                    .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
