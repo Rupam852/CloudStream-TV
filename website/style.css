@@ -154,13 +154,13 @@ header {
     letter-spacing: 0.5px;
 }
 
-nav {
+.nav-menu {
     display: flex;
     gap: 28px;
     align-items: center;
 }
 
-nav a {
+.nav-menu a {
     text-decoration: none;
     color: var(--text-muted);
     font-weight: 500;
@@ -168,9 +168,31 @@ nav a {
     transition: var(--transition);
 }
 
-nav a:hover, nav a.active {
+.nav-menu a:hover, .nav-menu a.active {
     color: var(--primary);
     text-shadow: 0 0 8px var(--text-glow);
+}
+
+/* Hamburger Menu button */
+.menu-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 24px;
+    height: 18px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    z-index: 150;
+    padding: 0;
+}
+
+.hamburger-bar {
+    width: 100%;
+    height: 2px;
+    background-color: var(--text-primary);
+    border-radius: 2px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Hero Section */
@@ -1145,9 +1167,68 @@ footer {
 
 @media (max-width: 768px) {
     header {
-        padding: 20px 5%;
+        padding: 15px 5%;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .menu-toggle {
+        display: flex;
+    }
+
+    /* Active X State */
+    .menu-toggle.active .hamburger-bar:nth-child(1) {
+        transform: translateY(8px) rotate(45deg);
+    }
+
+    .menu-toggle.active .hamburger-bar:nth-child(2) {
+        opacity: 0;
+        transform: scale(0);
+    }
+
+    .menu-toggle.active .hamburger-bar:nth-child(3) {
+        transform: translateY(-8px) rotate(-45deg);
+    }
+
+    /* Mobile Sliding Overlay */
+    .nav-menu {
+        position: fixed;
+        top: 0;
+        right: -100%;
+        width: 100%;
+        height: 100vh;
+        background: rgba(7, 10, 19, 0.98);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        display: flex;
         flex-direction: column;
-        gap: 15px;
+        align-items: center;
+        justify-content: center;
+        gap: 30px;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 140;
+        padding: 40px;
+    }
+
+    .nav-menu.active {
+        right: 0;
+    }
+
+    .nav-menu a {
+        font-size: 1.35rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        font-family: 'Outfit', sans-serif;
+    }
+
+    .nav-menu .download-nav-btn {
+        width: 80%;
+        max-width: 260px;
+        padding: 14px 28px;
+        font-size: 1.05rem;
+        text-align: center;
+        margin-top: 10px;
     }
     
     section {
