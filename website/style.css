@@ -101,8 +101,20 @@ header {
     width: 40px;
     height: 40px;
     border-radius: 10px; /* Slightly rounded */
-    box-shadow: 0 0 15px var(--text-glow);
+    border: 1.5px solid rgba(6, 182, 212, 0.25);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4),
+                0 0 12px rgba(6, 182, 212, 0.35),
+                0 0 25px rgba(99, 102, 241, 0.15);
     object-fit: cover;
+    transition: var(--transition);
+}
+
+.logo-img:hover {
+    border-color: rgba(6, 182, 212, 0.6);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5),
+                0 0 18px rgba(6, 182, 212, 0.55),
+                0 0 35px rgba(99, 102, 241, 0.3);
+    transform: scale(1.05);
 }
 
 .logo-icon {
