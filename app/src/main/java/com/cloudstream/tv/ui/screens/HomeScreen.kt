@@ -60,6 +60,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -74,6 +75,7 @@ import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
 import androidx.tv.foundation.lazy.grid.items
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.items
+import androidx.tv.foundation.lazy.list.itemsIndexed
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -128,6 +130,10 @@ fun HomeScreen(
 
     // Active folder for Rename/Remove options dialog
     var folderOptionsActiveFolder by remember { mutableStateOf<DriveLink?>(null) }
+
+    val foldersListTriggerFocusRequester = remember { FocusRequester() }
+    val lastFolderFocusRequester = remember { FocusRequester() }
+    val addLinkFocusRequester = remember { FocusRequester() }
     
     // Backdrop blur representation with debouncing to eliminate fast-scrolling network load stutter
     var targetBackdropUrl by remember { mutableStateOf<String?>(null) }
@@ -612,7 +618,14 @@ fun HomeScreen(
                     TVFocusableItem(
                         onClick = { isSidebarExpanded = !isSidebarExpanded },
                         shape = RoundedCornerShape(8.dp),
-                        scaleOnFocus = 1.02f
+                        scaleOnFocus = 1.02f,
+                        modifier = Modifier
+                            .focusRequester(foldersListTriggerFocusRequester)
+                            .focusProperties {
+                                if (savedFolders.isEmpty()) {
+                                    down = addLinkFocusRequester
+                                }
+                            }
                     ) { isFocused ->
                         LaunchedEffect(isFocused) {
                             if (isFocused) isSidebarExpanded = true
@@ -633,7 +646,17 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(savedFolders) { folder ->
+                        itemsIndexed(savedFolders) { index, folder ->
+                            val isLast = index == savedFolders.lastIndex
+                            val folderModifier = if (isLast) {
+                                Modifier
+                                    .focusRequester(lastFolderFocusRequester)
+                                    .focusProperties {
+                                        down = addLinkFocusRequester
+                                    }
+                            } else {
+                                Modifier
+                            }
                             TVSidebarItem(
                                 title = folder.name,
                                 icon = Icons.Default.Folder,
@@ -647,6 +670,7 @@ fun HomeScreen(
                                     Toast.makeText(context, "Switched to: ${folder.name}", Toast.LENGTH_SHORT).show()
                                 },
                                 isExpanded = isSidebarExpanded,
+                                modifier = folderModifier,
                                 onLongSelect = {
                                     folderOptionsActiveFolder = folder
                                 }
@@ -661,7 +685,16 @@ fun HomeScreen(
                         icon = Icons.Default.Add,
                         isSelected = false,
                         onSelect = { showAddFolderDialog = true },
-                        isExpanded = isSidebarExpanded
+                        isExpanded = isSidebarExpanded,
+                        modifier = Modifier
+                            .focusRequester(addLinkFocusRequester)
+                            .focusProperties {
+                                up = if (savedFolders.isNotEmpty()) {
+                                    lastFolderFocusRequester
+                                } else {
+                                    foldersListTriggerFocusRequester
+                                }
+                            }
                     )
 
 
@@ -1380,6 +1413,9 @@ fun FolderOptionsOverlay(
     ) {
         val focusRequester = remember { FocusRequester() }
         LaunchedEffect(Unit) {
+            // Delay requesting focus to allow the user to release the D-pad Center key
+            // that triggered the long press, preventing accidental clicks on the dialog options.
+            kotlinx.coroutines.delay(300)
             focusRequester.requestFocus()
         }
 
