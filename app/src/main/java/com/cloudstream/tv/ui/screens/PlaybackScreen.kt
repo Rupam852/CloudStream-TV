@@ -352,40 +352,27 @@ fun PlaybackScreen(
                         )
                     )
             ) {
-                // Top details: File Name & Time
-                Row(
+                // Top details: File Name
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.TopStart)
-                        .padding(32.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(32.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 16.dp)
-                    ) {
-                        Text(
-                            text = activeFile.name,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "Streaming from Google Drive",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color.White.copy(alpha = 0.6f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
                     Text(
-                        text = "${formatTime(currentPosition)} / ${formatTime(duration)}",
+                        text = activeFile.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "Streaming from Google Drive",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.8f)
+                        color = Color.White.copy(alpha = 0.6f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -396,29 +383,46 @@ fun PlaybackScreen(
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 32.dp, start = 32.dp, end = 32.dp)
                 ) {
-                    // Custom seekbar (Progress & Buffer bars)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Color.White.copy(alpha = 0.2f))
+                    // Seekbar with Time labels on both sides
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Buffer indicator
-                        val bufferFraction = if (duration > 0) bufferPosition.toFloat() / duration else 0f
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(bufferFraction)
-                                .height(6.dp)
-                                .background(Color.White.copy(alpha = 0.2f))
+                        Text(
+                            text = formatTime(currentPosition),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.8f)
                         )
-                        // Progress indicator
-                        val progressFraction = if (duration > 0) currentPosition.toFloat() / duration else 0f
+                        Spacer(modifier = Modifier.width(12.dp))
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth(progressFraction)
+                                .weight(1f)
                                 .height(6.dp)
-                                .background(MaterialTheme.colorScheme.primary)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Color.White.copy(alpha = 0.2f))
+                        ) {
+                            // Buffer indicator
+                            val bufferFraction = if (duration > 0) bufferPosition.toFloat() / duration else 0f
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(bufferFraction)
+                                    .height(6.dp)
+                                    .background(Color.White.copy(alpha = 0.2f))
+                            )
+                            // Progress indicator
+                            val progressFraction = if (duration > 0) currentPosition.toFloat() / duration else 0f
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(progressFraction)
+                                    .height(6.dp)
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = formatTime(duration),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.8f)
                         )
                     }
 
