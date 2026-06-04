@@ -1,0 +1,77 @@
+# CloudStream TV
+
+CloudStream TV is a premium, native Android TV application built using **Kotlin** and **Jetpack Compose for TV**. It is designed specifically for television screens to stream videos and display photo slideshows directly from **Google Drive** folders using either a public scraper or secure Google OAuth 2.0 Device flow.
+
+---
+
+## 📺 Key Features
+
+- **ExoPlayer Video Streaming**: Premium media playback supporting Play/Pause, fast-forward/rewind, aspect ratio scaling (fit/fill/zoom), and playback speed controls.
+- **Photo Slideshows**: Beautiful, automated image slideshows with custom transition intervals (3s, 5s, 10s, 15s) and manual traversal.
+- **Google OAuth 2.0 (Device Flow)**: Secure sign-in designed for TV devices. Displays an activation link alongside a dynamic **QR Code** for quick scanning from a phone or computer.
+- **Lag-Free TV Performance**: Native D-pad focus animations, canvas-level visual styles, and background image debouncing for a smooth 60FPS TV experience.
+- **Recents & History**: Seamless shelf showing recently streamed items, with one-press retry and clear history actions.
+- **Overlay Sidebar**: Expandable navigation menu for switching between folders, adding new drives, and toggling dark/light themes.
+
+---
+
+## 🚫 Supported Formats
+
+CloudStream TV is strictly optimized for **Video** and **Photo** streaming. Other file formats are not supported.
+
+### ✅ Supported Media Type Streams
+- **Videos**: `.mp4`, `.mkv`, `.webm`, `.m4v`, `.3gp`, etc.
+- **Photos**: `.jpg`, `.jpeg`, `.png`, `.webp`, `.bmp`, etc.
+
+### ❌ Unsupported Formats (Displays Warning Toast)
+- Documents (`.pdf`, `.docx`, `.xlsx`, `.pptx`)
+- Raw text files (`.txt`, `.json`)
+- Audio-only files (`.mp3`, `.wav`)
+- Unsupported formats will trigger a `"File streaming not supported"` message.
+
+---
+
+## 🔗 Google Drive Folder Link & Access Requirements
+
+To browse and stream folders, you must supply a folder URL or folder ID. The app handles two modes of folder access:
+
+### 1. Public Folders (Scraper Mode)
+- **Requirement**: The Google Drive folder **must be shared publicly**.
+- **Sharing Settings**: Right-click the folder in Google Drive -> click **Share** -> under **General Access**, change from *Restricted* to **"Anyone with the link"** and set the role to **"Viewer"**.
+- If this permission is not set, the public scraper will fail to fetch media items.
+
+### 2. Private Folders (Google Authenticated Mode)
+- **Requirement**: If the folder is private, you must link it and log in.
+- **Sharing Settings**: The Google Account that you use to log in via the QR code/Device activation flow **must have permission** to view the linked Google Drive folder.
+
+### Accepted Link Formats
+You can input either the full sharing link or the folder ID directly:
+*   **Full URL**: `https://drive.google.com/drive/folders/1a2b3c4d5e6f7g8h9i0j_k_l_m_n_o_p`
+*   **Folder ID**: `1a2b3c4d5e6f7g8h9i0j_k_l_m_n_o_p`
+
+---
+
+## 🛠️ Technology Stack
+
+- **Core**: Kotlin & Android SDK
+- **UI Framework**: Jetpack Compose for TV (Material 3)
+- **Video Playback**: AndroidX Media3 ExoPlayer
+- **Image Loading**: Coil (with HTTP cache headers and crossfades)
+- **Networking**: OkHttp3 & Google Drive REST API
+- **JSON Parser**: Gson
+
+---
+
+## 🚀 Installation & Build
+
+Pre-compiled APKs are available in the root folder of the project:
+*   **Release APK**: `app-release.apk` (Optimized, signed production bundle)
+*   **Debug APK**: `app-debug.apk` (Development build)
+
+### Building from Source
+Ensure you have the Android SDK path configured in `local.properties`. Run the following command in the project root:
+
+```bash
+# Compile both configurations
+./gradlew.bat assembleRelease assembleDebug
+```
