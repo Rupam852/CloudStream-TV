@@ -83,6 +83,7 @@ import com.cloudstream.tv.ui.components.TVCard
 import com.cloudstream.tv.ui.components.TVFocusableItem
 import com.cloudstream.tv.ui.components.TVSearchBar
 import com.cloudstream.tv.ui.components.TVSidebarItem
+import com.cloudstream.tv.ui.components.TVWideCard
 import com.cloudstream.tv.ui.theme.CloudStreamTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -187,40 +188,8 @@ fun HomeScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // 1. Dynamic Backdrop Blur of Selected Card
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(0.35f)
-            ) {
-                AnimatedVisibility(
-                    visible = !backdropUrl.isNullOrBlank(),
-                    enter = fadeIn(animationSpec = tween(600)),
-                    exit = fadeOut(animationSpec = tween(600))
-                ) {
-                    AsyncImage(
-                        model = backdropUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .blur(40.dp)
-                    )
-                }
-                // Ambient gradient overlay to meld into theme
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.9f)
-                                )
-                            )
-                        )
-                )
-            }
+            // 1. Dynamic Backdrop Blur of Selected Card (using provider to isolate recomposition)
+            HomeScreenBackdrop(backdropUrlProvider = { backdropUrl })
 
             // 2. Main Row Layout: Sidebar + Content
             Row(modifier = Modifier.fillMaxSize()) {
@@ -431,7 +400,7 @@ fun HomeScreen(
                         ) {
                             items(recentlyViewedList) { file ->
                                 val icon = if (file.isVideo) Icons.Default.Movie else Icons.Default.Image
-                                TVCard(
+                                TVWideCard(
                                     title = file.name,
                                     subtitle = if (file.isVideo) "Video File" else "Photo File",
                                     icon = icon,
@@ -1178,5 +1147,44 @@ fun GoogleLoginOverlay(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun HomeScreenBackdrop(
+    backdropUrlProvider: () -> String?,
+    modifier: Modifier = Modifier
+) {
+    val backdropUrl = backdropUrlProvider()
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .alpha(0.12f)
+    ) {
+        AnimatedVisibility(
+            visible = !backdropUrl.isNullOrBlank(),
+            enter = fadeIn(animationSpec = tween(600)),
+            exit = fadeOut(animationSpec = tween(600))
+        ) {
+            AsyncImage(
+                model = backdropUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        // Ambient gradient overlay to meld into theme
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.9f)
+                        )
+                    )
+                )
+        )
     }
 }

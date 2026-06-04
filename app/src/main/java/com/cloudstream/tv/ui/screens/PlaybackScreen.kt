@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
@@ -100,7 +101,7 @@ fun PlaybackScreen(
     }
 
     // Playback and UI States
-    var isPlaying by remember { mutableStateOf(true) }
+    var isPlaying by remember { mutableStateOf(exoPlayer.playWhenReady) }
     var currentPosition by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var bufferPosition by remember { mutableLongStateOf(0L) }
@@ -145,19 +146,26 @@ fun PlaybackScreen(
         }
         exoPlayer.prepare()
         exoPlayer.play()
-        isPlaying = true
     }
 
     // Listen to player state changes
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                isPlaying = playWhenReady
             }
 
             override fun onPlaybackStateChanged(state: Int) {
                 duration = exoPlayer.duration.coerceAtLeast(0L)
                 isBuffering = state == Player.STATE_BUFFERING
+                if (state == Player.STATE_ENDED) {
+                    if (activeIndex < playlist.size - 1) {
+                        activeIndex++
+                    } else {
+                        exoPlayer.seekTo(0)
+                        exoPlayer.pause()
+                    }
+                }
             }
         }
         exoPlayer.addListener(listener)
@@ -199,12 +207,11 @@ fun PlaybackScreen(
 
     fun togglePlayPause() {
         showControls()
-        if (isPlaying) {
+        if (exoPlayer.playWhenReady) {
             exoPlayer.pause()
         } else {
             exoPlayer.play()
         }
-        isPlaying = !isPlaying
     }
 
     fun seekForward() {
@@ -354,17 +361,25 @@ fun PlaybackScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 16.dp)
+                    ) {
                         Text(
                             text = activeFile.name,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "Streaming from Google Drive",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = Color.White.copy(alpha = 0.6f)
+                            color = Color.White.copy(alpha = 0.6f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     Text(

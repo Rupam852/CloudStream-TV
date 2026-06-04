@@ -94,7 +94,7 @@ class DriveRepository(context: Context) {
     }
 
     fun isGridView(): Boolean {
-        return prefs.getBoolean(KEY_GRID_VIEW, true) // default true
+        return prefs.getBoolean(KEY_GRID_VIEW, false) // default false
     }
 
     fun setGridView(enabled: Boolean) {
