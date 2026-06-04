@@ -382,8 +382,6 @@ fun TVSearchBar(
         LaunchedEffect(isEditing) {
             if (isEditing) {
                 textFocusRequester.requestFocus()
-            } else {
-                focusRequester.requestFocus()
             }
         }
 
