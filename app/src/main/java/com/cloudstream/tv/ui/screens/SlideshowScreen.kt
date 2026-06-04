@@ -59,6 +59,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.cloudstream.tv.data.DriveFile
 import com.cloudstream.tv.data.DriveRepository
 import com.cloudstream.tv.ui.components.TVFocusableItem
+import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalTvMaterial3Api::class)
@@ -75,6 +76,10 @@ fun SlideshowScreen(
         return
     }
 
+    // Intercept back gesture/button to go back to Home screen instead of exiting the activity
+    BackHandler {
+        onBack()
+    }
     var activeIndex by remember { mutableIntStateOf(photos.indexOfFirst { it.id == currentFile.id }.coerceAtLeast(0)) }
     val activePhoto = remember(activeIndex) { photos.getOrNull(activeIndex) ?: currentFile }
     var oauthToken by remember { mutableStateOf<String?>(null) }
@@ -153,23 +158,25 @@ fun SlideshowScreen(
             .background(Color.Black)
             .clickable { showControls() }
             .onPreviewKeyEvent { keyEvent ->
-                showControls()
                 if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
+                    val wasVisible = controlsVisible
+                    showControls()
                     when (keyEvent.nativeKeyEvent.keyCode) {
-                        KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                            false
-                        }
                         KeyEvent.KEYCODE_DPAD_LEFT -> {
-                            goPrev()
-                            true
+                            if (!wasVisible) {
+                                goPrev()
+                                true
+                            } else {
+                                false
+                            }
                         }
                         KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            goNext()
-                            true
-                        }
-                        KeyEvent.KEYCODE_BACK -> {
-                            onBack()
-                            true
+                            if (!wasVisible) {
+                                goNext()
+                                true
+                            } else {
+                                false
+                            }
                         }
                         else -> false
                     }

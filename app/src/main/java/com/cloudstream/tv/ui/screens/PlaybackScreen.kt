@@ -69,6 +69,7 @@ import com.cloudstream.tv.network.GoogleDriveClient
 import com.cloudstream.tv.ui.components.TVFocusableItem
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -83,6 +84,11 @@ fun PlaybackScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    
+    // Intercept back gesture/button to go back to Home screen instead of exiting the activity
+    BackHandler {
+        onBack()
+    }
     var activeIndex by remember { mutableStateOf(playlist.indexOfFirst { it.id == currentFile.id }.coerceAtLeast(0)) }
     val activeFile = remember(activeIndex) { playlist.getOrNull(activeIndex) ?: currentFile }
 
@@ -255,26 +261,25 @@ fun PlaybackScreen(
             .background(Color.Black)
             .clickable(onClick = { showControls() })
             .onPreviewKeyEvent { keyEvent ->
-                showControls()
                 if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
+                    val wasVisible = controlsVisible
+                    showControls()
                     when (keyEvent.nativeKeyEvent.keyCode) {
-                        KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                            // Let standard focus handler handle if it's on a button,
-                            // otherwise play/pause on screen click.
-                            false
-                        }
                         KeyEvent.KEYCODE_DPAD_LEFT -> {
-                            // If overlay controls are visible, we can fast rewind.
-                            seekRewind()
-                            true
+                            if (!wasVisible) {
+                                seekRewind()
+                                true
+                            } else {
+                                false
+                            }
                         }
                         KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            seekForward()
-                            true
-                        }
-                        KeyEvent.KEYCODE_BACK -> {
-                            onBack()
-                            true
+                            if (!wasVisible) {
+                                seekForward()
+                                true
+                            } else {
+                                false
+                            }
                         }
                         else -> false
                     }
