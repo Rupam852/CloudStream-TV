@@ -97,6 +97,14 @@ header {
     text-decoration: none;
 }
 
+.logo-img {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px; /* Slightly rounded */
+    box-shadow: 0 0 15px var(--text-glow);
+    object-fit: cover;
+}
+
 .logo-icon {
     width: 40px;
     height: 40px;
