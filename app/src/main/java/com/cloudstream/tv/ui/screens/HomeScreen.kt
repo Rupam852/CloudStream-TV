@@ -649,12 +649,6 @@ fun HomeScreen(
                         selectedFolderId = repository.getLastSelectedFolderId()
                         currentFolderId = selectedFolderId
                         showAddFolderDialog = false
-                    },
-                    onAccountStatusChanged = {
-                        savedFolders.clear()
-                        savedFolders.addAll(repository.getSavedLinks())
-                        selectedFolderId = repository.getLastSelectedFolderId()
-                        currentFolderId = selectedFolderId
                     }
                 )
             }
@@ -668,8 +662,7 @@ fun HomeScreen(
 fun AddFolderOverlay(
     repository: DriveRepository,
     onDismiss: () -> Unit,
-    onFolderAdded: () -> Unit,
-    onAccountStatusChanged: () -> Unit
+    onFolderAdded: () -> Unit
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -709,80 +702,6 @@ fun AddFolderOverlay(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Account status integration inside Add Folder dialog
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    val isLoggedIn = repository.isLoggedIn()
-                    Text(
-                        text = if (isLoggedIn) "Account: ${repository.getOAuthEmail() ?: "Signed In"}" else "Account: Not signed in",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-
-                    if (isLoggedIn) {
-                        TVFocusableItem(
-                            onClick = {
-                                repository.clearOAuthTokens()
-                                if (repository.getLastSelectedFolderId() == "root") {
-                                    repository.setLastSelectedFolderId(null)
-                                }
-                                Toast.makeText(context, "Logged out successfully!", Toast.LENGTH_SHORT).show()
-                                onAccountStatusChanged()
-                            },
-                            shape = RoundedCornerShape(8.dp)
-                        ) { isFocused ->
-                            Text(
-                                text = "Sign Out",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isFocused) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.error,
-                                modifier = Modifier
-                                    .background(
-                                        if (isFocused) MaterialTheme.colorScheme.errorContainer
-                                        else Color.Transparent,
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
-                        }
-                    } else {
-                        var showLocalLogin by remember { mutableStateOf(false) }
-                        if (showLocalLogin) {
-                            GoogleLoginOverlay(
-                                repository = repository,
-                                onDismiss = { showLocalLogin = false },
-                                onLoginSuccess = {
-                                    showLocalLogin = false
-                                    onAccountStatusChanged()
-                                }
-                            )
-                        }
-                        TVFocusableItem(
-                            onClick = { showLocalLogin = true },
-                            shape = RoundedCornerShape(8.dp)
-                        ) { isFocused ->
-                            Text(
-                                text = "Sign In",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .background(
-                                        if (isFocused) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
-                        }
-                    }
-                }
-
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(text = "Folder Link or ID", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
