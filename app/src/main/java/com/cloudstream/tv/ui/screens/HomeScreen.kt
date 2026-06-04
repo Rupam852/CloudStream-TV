@@ -252,25 +252,6 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (repository.isLoggedIn()) {
-                            item {
-                                TVSidebarItem(
-                                    title = "My Drive",
-                                    icon = Icons.Default.Folder,
-                                    isSelected = currentFolderId == "root" || selectedFolderId == "root",
-                                    onSelect = {
-                                        folderNavigationStack.clear()
-                                        selectedFolderId = "root"
-                                        currentFolderId = "root"
-                                        repository.setLastSelectedFolderId("root")
-                                        loadFolder("root")
-                                        Toast.makeText(context, "Switched to: My Drive", Toast.LENGTH_SHORT).show()
-                                    },
-                                    isExpanded = isSidebarExpanded
-                                )
-                            }
-                        }
-
                         items(savedFolders) { folder ->
                             TVSidebarItem(
                                 title = folder.name,
