@@ -51,6 +51,24 @@ You can input either the full sharing link or the folder ID directly:
 
 ---
 
+## 🌐 OAuth Web Login Backend Bridge
+
+The project includes a lightweight Node.js/Express authentication server located in the [backend](file:///d:/PROJECT/CloudStream%20TV/backend) directory. It serves as an authorization bridge to handle Google OAuth 2.0 credentials safely for TV devices.
+
+### How it Works
+1. **Initiate Session**: When the TV user clicks **Link Folder & Google Authenticate**, the TV app calls the backend to register a temporary session ID.
+2. **Scan & Authorize**: The TV app displays a **QR Code** pointing to the backend login URL. The user scans it with a phone or computer browser, redirects to Google's standard web authentication page, and grants read-only Google Drive access.
+3. **Token Callback**: Google redirects back to the backend callback endpoint with an auth code. The backend exchanges this code for access/refresh tokens and securely caches them.
+4. **Polling & Completion**: The TV app polls the backend every few seconds using the session ID. Once tokens are retrieved, they are securely saved locally inside the TV's encrypted preferences, and the backend session cache is cleared.
+
+### Environment Configuration
+To deploy the backend (e.g., to Render or Heroku), configure the following environment variables:
+- `GOOGLE_CLIENT_ID`: Google Developer Console OAuth Web Client ID.
+- `GOOGLE_CLIENT_SECRET`: Google Developer Console OAuth Web Client Secret.
+- `GOOGLE_REDIRECT_URI`: The authorized redirect callback URL (e.g., `https://your-app.onrender.com/api/callback`).
+
+---
+
 ## 🛠️ Technology Stack
 
 - **Core**: Kotlin & Android SDK
