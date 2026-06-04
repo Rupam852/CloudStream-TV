@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudStream TV - Stream Google Drive on Android TV</title>
+    <meta name="description" content="Download CloudStream TV, a premium native Android TV application to stream videos and display photo slideshows directly from your Google Drive.">
+    <link rel="icon" type="image/png" href="assets/logo.png">
+    
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background glowing accents -->
+    <div class="bg-glows">
+        <div class="glow-1"></div>
+        <div class="glow-2"></div>
+    </div>
+
+    <!-- Navigation Header -->
+    <header>
+        <div class="nav-container">
+            <a href="#" class="logo-section">
+                <img src="assets/logo.png" alt="CloudStream TV Logo">
+                <span>CloudStream TV</span>
+            </a>
+            <nav>
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#sideload">TV Install Guide</a>
+                <a href="privacy.html">Privacy Policy</a>
+                <a href="app-release.apk" class="nav-btn" download>Download APK</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-tagline">Native Android TV App</div>
+            <h1>Google Drive, Streamed on the Big Screen</h1>
+            <p>Connect your public or private Google Drive folders and start streaming videos, browsing photos, and running slideshows directly on your TV. No computer or phone casting required.</p>
+            <div class="hero-actions">
+                <a href="app-release.apk" class="btn btn-primary" download>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download Release APK
+                </a>
+                <a href="app-debug.apk" class="btn btn-secondary" download>
+                    Download Debug APK
+                </a>
+            </div>
+        </div>
+        <div class="hero-media">
+            <div class="tv-mockup">
+                <img src="assets/banner.png" alt="CloudStream TV Interface Widescreen Banner">
+            </div>
+        </div>
+    </section>
+
+    <!-- App Capabilities / Core Analytics -->
+    <section id="features">
+        <div class="section-header">
+            <h2>Core Features & Capabilities</h2>
+            <p>CloudStream TV is custom-engineered to deliver a smooth, high-fidelity experience optimized specifically for the Android TV Leanback interface.</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon-wrapper">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </div>
+                <h3>Smart Directory Fetching</h3>
+                <p>Features a dual-mode engine. It can scrape public folders instantly without credentials, or use secure OAuth 2.0 device flow to load your private personal folders directly through Google API.</p>
+            </div>
+            
+            <div class="feature-card">
+                <div class="feature-icon-wrapper">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </div>
+                <h3>Advanced Media HUD</h3>
+                <p>Integrated ExoPlayer supporting custom TV controls, play/pause toggles, 10s skip forward/backward, playback speed adjustments (0.5x to 2.0x), and screen aspect ratio scaling.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon-wrapper">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                </div>
+                <h3>Seamless Photo Engine</h3>
+                <p>View images in full screen or launch automated, high-resolution slideshows with customizable slide transitions and intervals (3s, 5s, 10s, 15s) using remote control shortcuts.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Interactive How It Works Section -->
+    <section id="how-it-works">
+        <div class="section-header">
+            <h2>How CloudStream TV Works</h2>
+            <p>A simple, secure connection setup designed to run entirely on your TV device without intermediate third-party servers.</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <h3>1. Input or Login</h3>
+                <p>Enter any Google Drive public folder URL/ID directly, or choose secure Google Sign-In. The TV displays a QR code which you scan using your phone/computer to authorize access safely.</p>
+            </div>
+            <div class="feature-card">
+                <h3>2. Instant Scraping</h3>
+                <p>The Kotlin client parses the Google Drive folder contents locally. It maps the subfolders, photo files, and video streams, caching folder information in secure local storage.</p>
+            </div>
+            <div class="feature-card">
+                <h3>3. Pure Streaming</h3>
+                <p>When you select a file, it starts streaming directly from Google servers to ExoPlayer. Files are never downloaded to local memory, ensuring lightweight operation.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- TV Installation Guide (Send Files to TV) -->
+    <section id="sideload">
+        <div class="section-header">
+            <h2>How to Install on Your Android TV</h2>
+            <p>Follow this step-by-step guide to transfer the downloaded APK from your Android phone directly to your TV using the **Send Files to TV** application.</p>
+        </div>
+        <div class="sfttv-container">
+            <div class="instruction-steps">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <div class="step-details">
+                        <h3>Install Send Files to TV <span class="badge">SFTTV</span></h3>
+                        <p>Open the Google Play Store on both your **Android TV** and your **Android Phone**. Search for and install the free application **"Send Files to TV"** on both devices.</p>
+                    </div>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <div class="step-details">
+                        <h3>Download the APK</h3>
+                        <p>On your Android Phone, click on the **Download Release APK** button at the top of this website to download the `app-release.apk` file to your mobile downloads folder.</p>
+                    </div>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <div class="step-details">
+                        <h3>Transmit the File</h3>
+                        <p>Open the **Send Files to TV** application on both devices. On your TV, select **Receive**. On your Phone, select **Send**, locate the downloaded `app-release.apk` file in your files, and select it. The file will transfer instantly over your local Wi-Fi.</p>
+                    </div>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number">4</div>
+                    <div class="step-details">
+                        <h3>Install on TV</h3>
+                        <p>Once the transfer completes, download a file manager app (such as *File Commander* or *FX File Explorer*) from the TV Play Store. Open the file manager, go to your TV's **Download** folder, click on the `app-release.apk` file, and install it. *(You may need to toggle 'Allow Unknown Sources' for the file manager when prompted).*</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-container">
+            <div class="footer-brand">
+                <h3>CloudStream TV</h3>
+                <p>Native media streaming application for Android TV and Google TV devices.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Application</h4>
+                <ul>
+                    <li><a href="#features">Features</a></li>
+                    <li><a href="#how-it-works">How It Works</a></li>
+                    <li><a href="#sideload">Install Guide</a></li>
+                    <li><a href="privacy.html">Privacy Policy</a></li>
+                </ul>
+            </div>
+            <div class="footer-contact">
+                <h4>Support & Contact</h4>
+                <p>Have questions or need help setting up?</p>
+                <p>Developer Contact Email:</p>
+                <a href="mailto:cloudstreamtvsupport@gmail.com">cloudstreamtvsupport@gmail.com</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 CloudStream TV. All rights reserved. Google Drive is a trademark of Google LLC.</p>
+        </div>
+    </footer>
+</body>
+</html>
