@@ -171,10 +171,16 @@ fun HomeScreen(
         }
     }
 
+    var showExitDialog by remember { mutableStateOf(false) }
+
     // Handle physical TV Back Button
-    BackHandler(enabled = folderNavigationStack.isNotEmpty()) {
-        val previousFolder = folderNavigationStack.removeAt(folderNavigationStack.lastIndex)
-        currentFolderId = previousFolder
+    BackHandler(enabled = true) {
+        if (folderNavigationStack.isNotEmpty()) {
+            val previousFolder = folderNavigationStack.removeAt(folderNavigationStack.lastIndex)
+            currentFolderId = previousFolder
+        } else {
+            showExitDialog = true
+        }
     }
 
     // Filter files based on search
@@ -702,6 +708,12 @@ fun HomeScreen(
                     }
                 )
             }
+
+            if (showExitDialog) {
+                ExitDialogOverlay(
+                    onDismiss = { showExitDialog = false }
+                )
+            }
         }
     }
 }
@@ -1195,5 +1207,116 @@ fun HomeScreenBackdrop(
                     )
                 )
         )
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+fun ExitDialogOverlay(
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnClickOutside = false
+        )
+    ) {
+        val context = LocalContext.current
+        val cancelFocusRequester = remember { FocusRequester() }
+
+        LaunchedEffect(Unit) {
+            cancelFocusRequester.requestFocus()
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.8f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(380.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Exit CloudStream TV",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Are you sure you want to close the app?",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TVFocusableItem(
+                        onClick = {
+                            val activity = context as? android.app.Activity
+                            activity?.finishAndRemoveTask()
+                        },
+                        shape = RoundedCornerShape(8.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .width(130.dp)
+                                .background(
+                                    if (isFocused) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Exit",
+                                color = if (isFocused) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    TVFocusableItem(
+                        onClick = onDismiss,
+                        modifier = Modifier.focusRequester(cancelFocusRequester),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .width(130.dp)
+                                .background(
+                                    if (isFocused) MaterialTheme.colorScheme.surfaceVariant
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Cancel",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
