@@ -59,6 +59,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -207,7 +208,10 @@ fun HomeScreen(
                         .fillMaxHeight()
                         .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
                         .padding(vertical = 16.dp, horizontal = 8.dp)
-                        .focusRequester(remember { FocusRequester() }),
+                        .focusRequester(remember { FocusRequester() })
+                        .onFocusChanged { focusState ->
+                            isSidebarExpanded = focusState.hasFocus
+                        },
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Brand / Logo

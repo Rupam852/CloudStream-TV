@@ -133,17 +133,22 @@ fun PlaybackScreen(
     LaunchedEffect(resolvedUrl, oauthToken) {
         val url = resolvedUrl ?: return@LaunchedEffect
         val mediaItem = MediaItem.fromUri(url)
-        val token = oauthToken
-        if (token != null && url.contains("googleapis.com")) {
-            val dataSourceFactory = DefaultHttpDataSource.Factory().apply {
+        
+        // Build a robust HTTP DataSource Factory that sets a standard browser User-Agent
+        // and enables redirects, which ensures Google Drive streams accept Range headers and are seekable.
+        val dataSourceFactory = DefaultHttpDataSource.Factory().apply {
+            setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            setAllowCrossProtocolRedirects(true)
+            val token = oauthToken
+            if (token != null && url.contains("googleapis.com")) {
                 setDefaultRequestProperties(mapOf("Authorization" to "Bearer $token"))
             }
-            val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
-                .createMediaSource(mediaItem)
-            exoPlayer.setMediaSource(mediaSource)
-        } else {
-            exoPlayer.setMediaItem(mediaItem)
         }
+        
+        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+            .createMediaSource(mediaItem)
+        
+        exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
         exoPlayer.play()
     }
