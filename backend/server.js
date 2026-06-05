@@ -8,11 +8,11 @@ const PORT = process.env.PORT || 3000;
 // maps sessionId -> { status: 'pending'|'authorized', tokens: null|{ access_token, refresh_token, expires_in, email } }
 const sessions = new Map();
 
-// Automatic cleanup: Delete sessions older than 10 minutes to prevent memory leak
+// Automatic cleanup: Delete sessions older than 5 minutes to prevent memory leak
 setInterval(() => {
     const now = Date.now();
     for (const [id, session] of sessions.entries()) {
-        if (now - session.createdAt > 600000) {
+        if (now - session.createdAt > 300000) { // 5 minutes threshold
             sessions.delete(id);
         }
     }

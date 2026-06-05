@@ -489,7 +489,7 @@ object GoogleDriveClient {
                     device_code = sessionRes.session_id, // used as the session code for polling
                     user_code = sessionRes.session_id,   // session code displayed on TV
                     verification_url = "$BACKEND_URL/api/login?session=${sessionRes.session_id}", // URL for phone
-                    expires_in = 600, // 10 minutes expiry
+                    expires_in = 300, // 5 minutes expiry
                     interval = 4 // poll every 4 seconds
                 )
             }
