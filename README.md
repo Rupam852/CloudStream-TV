@@ -1,8 +1,4 @@
 <p align="center">
-  <img src="assets/banner.png" alt="CloudStream TV Banner" width="100%" />
-</p>
-
-<p align="center">
   <img src="assets/logo.png" alt="CloudStream TV Logo" width="120px" height="120px" />
 </p>
 
