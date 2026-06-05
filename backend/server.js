@@ -18,9 +18,97 @@ setInterval(() => {
     }
 }, 60000);
 
-// Basic home page check
+// Basic home page check with session code entry form
 app.get('/', (req, res) => {
-    res.send('<h1>CloudStream TV Auth Server</h1><p>Running successfully!</p>');
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>CloudStream TV - Authenticate</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                    background: #0f172a;
+                    color: #f8fafc;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100vh;
+                    margin: 0;
+                    padding: 20px;
+                    box-sizing: border-box;
+                }
+                .card {
+                    background: #1e293b;
+                    border-radius: 16px;
+                    padding: 32px;
+                    width: 100%;
+                    max-width: 400px;
+                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+                    text-align: center;
+                    border: 1px solid #334155;
+                }
+                h1 {
+                    color: #06b6d4;
+                    font-size: 28px;
+                    margin: 0 0 12px 0;
+                }
+                p {
+                    color: #94a3b8;
+                    font-size: 15px;
+                    margin: 0 0 24px 0;
+                    line-height: 1.6;
+                }
+                input {
+                    width: 100%;
+                    padding: 14px 16px;
+                    border-radius: 8px;
+                    border: 1px solid #475569;
+                    background: #0f172a;
+                    color: #f8fafc;
+                    font-size: 20px;
+                    text-align: center;
+                    letter-spacing: 2px;
+                    font-weight: bold;
+                    box-sizing: border-box;
+                    margin-bottom: 20px;
+                    text-transform: uppercase;
+                }
+                input:focus {
+                    outline: none;
+                    border-color: #06b6d4;
+                    box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+                }
+                button {
+                    width: 100%;
+                    padding: 14px;
+                    border-radius: 8px;
+                    border: none;
+                    background: #06b6d4;
+                    color: #0f172a;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    transition: background 0.2s;
+                }
+                button:hover {
+                    background: #0891b2;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h1>CloudStream TV</h1>
+                <p>Enter the 6-character session code shown on your TV screen to authenticate with Google.</p>
+                <form action="/api/login" method="get">
+                    <input type="text" name="session" placeholder="E.G. E0127B" required maxlength="12" autocomplete="off">
+                    <button type="submit">Connect with Google</button>
+                </form>
+            </div>
+        </body>
+        </html>
+    `);
 });
 
 // Endpoint 1: TV requests a new Session ID

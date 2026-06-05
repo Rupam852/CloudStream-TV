@@ -1101,7 +1101,7 @@ fun GoogleLoginOverlay(
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                                 )
                                 Text(
-                                    text = verificationUrl.ifBlank { "google.com/device" },
+                                    text = if (verificationUrl.contains("onrender.com")) "cloudstream-tv.onrender.com" else verificationUrl.ifBlank { "google.com/device" },
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
