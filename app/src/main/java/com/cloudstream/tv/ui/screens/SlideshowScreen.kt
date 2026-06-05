@@ -103,11 +103,11 @@ fun SlideshowScreen(
     var activeIndex by remember { mutableIntStateOf(photos.indexOfFirst { it.id == currentFile.id }.coerceAtLeast(0)) }
     val activePhoto = remember(activeIndex) { photos.getOrNull(activeIndex) ?: currentFile }
     var oauthToken by remember { mutableStateOf<String?>(null) }
+    var apiKey by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(activePhoto) {
-        if (repository.isLoggedIn()) {
-            oauthToken = repository.getAccessToken()
-        }
+        oauthToken = if (repository.isLoggedIn()) repository.getAccessToken() else null
+        apiKey = repository.getApiKey()
     }
 
     var isPlaying by remember { mutableStateOf(true) }
@@ -213,12 +213,20 @@ fun SlideshowScreen(
             label = "photoFade"
         ) { photo ->
             val context = LocalContext.current
-            val imageModel = remember(photo, oauthToken) {
+            val imageModel = remember(photo, oauthToken, apiKey) {
                 val token = oauthToken
-                if (token != null && !photo.id.startsWith("http")) {
+                val key = apiKey
+                if (photo.id.startsWith("http")) {
+                    photo.id
+                } else if (token != null) {
                     ImageRequest.Builder(context)
                         .data("https://www.googleapis.com/drive/v3/files/${photo.id}?alt=media")
                         .setHeader("Authorization", "Bearer $token")
+                        .crossfade(true)
+                        .build()
+                } else if (!key.isNullOrBlank()) {
+                    ImageRequest.Builder(context)
+                        .data("https://www.googleapis.com/drive/v3/files/${photo.id}?alt=media&key=$key")
                         .crossfade(true)
                         .build()
                 } else {

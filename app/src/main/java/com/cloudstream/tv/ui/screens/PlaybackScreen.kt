@@ -174,8 +174,9 @@ fun PlaybackScreen(
         isResolving = true
         resolvedUrl = null
         val token = if (repository.isLoggedIn()) repository.getAccessToken() else null
+        val apiKey = repository.getApiKey()
         oauthToken = token
-        val url = GoogleDriveClient.resolveDriveDirectUrl(activeFile.id, token)
+        val url = GoogleDriveClient.resolveDriveDirectUrl(activeFile.id, token, apiKey)
         resolvedUrl = url
         isResolving = false
     }
