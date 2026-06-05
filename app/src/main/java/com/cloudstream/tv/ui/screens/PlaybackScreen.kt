@@ -31,8 +31,8 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.VolumeUp
 import android.media.audiofx.LoudnessEnhancer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -149,7 +149,7 @@ fun PlaybackScreen(
             // Set audio attributes to optimize for TV movie playback
             val attributes = androidx.media3.common.AudioAttributes.Builder()
                 .setUsage(androidx.media3.common.C.USAGE_MEDIA)
-                .setContentType(androidx.media3.common.C.CONTENT_TYPE_MOVIE)
+                .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
                 .build()
             setAudioAttributes(attributes, true)
         }
@@ -728,7 +728,7 @@ fun PlaybackScreen(
                                     3 -> "200% (High Boost)"
                                     else -> "100%"
                                 }
-                                showToast("Audio Boost: $boostText", Icons.Default.VolumeUp)
+                                showToast("Audio Boost: $boostText", Icons.AutoMirrored.Filled.VolumeUp)
                             },
                             shape = RoundedCornerShape(8.dp),
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
@@ -745,7 +745,7 @@ fun PlaybackScreen(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.VolumeUp,
+                                        imageVector = Icons.AutoMirrored.Filled.VolumeUp,
                                         contentDescription = null,
                                         tint = if (isFocused) MaterialTheme.colorScheme.onPrimary else Color.White,
                                         modifier = Modifier.size(18.dp)

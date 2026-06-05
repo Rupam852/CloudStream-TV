@@ -29,14 +29,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -563,7 +563,7 @@ fun HomeScreen(
                                             containerColor = MaterialTheme.colorScheme.surface,
                                             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                                             modifier = Modifier.fillMaxWidth()
-                                        ) { isFocused ->
+                                        ) { _ ->
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
@@ -726,7 +726,7 @@ fun HomeScreen(
 
                     TVSidebarItem(
                         title = if (isGridView) "List View" else "Grid View",
-                        icon = if (isGridView) Icons.Default.List else Icons.Default.GridView,
+                        icon = if (isGridView) Icons.AutoMirrored.Filled.List else Icons.Default.GridView,
                         isSelected = false,
                         onSelect = {
                             isGridView = !isGridView
@@ -739,7 +739,7 @@ fun HomeScreen(
 
                     TVSidebarItem(
                         title = "Logout",
-                        icon = Icons.Default.ExitToApp,
+                        icon = Icons.AutoMirrored.Filled.ExitToApp,
                         isSelected = false,
                         onSelect = {
                             // Reset credentials
