@@ -626,48 +626,12 @@ fun PlaybackScreen(
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 32.dp, start = 32.dp, end = 32.dp)
                 ) {
-                    // Seekbar with Time labels on both sides
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = formatTime(currentPosition),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(Color.White.copy(alpha = 0.2f))
-                        ) {
-                            // Buffer indicator
-                            val bufferFraction = if (duration > 0) bufferPosition.toFloat() / duration else 0f
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(bufferFraction)
-                                    .height(6.dp)
-                                    .background(Color.White.copy(alpha = 0.2f))
-                            )
-                            // Progress indicator
-                            val progressFraction = if (duration > 0) currentPosition.toFloat() / duration else 0f
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(progressFraction)
-                                    .height(6.dp)
-                                    .background(MaterialTheme.colorScheme.primary)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = formatTime(duration),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                    }
+                    // Seekbar with Time labels on both sides (Isolated Recomposition scope)
+                    PlaybackTimeline(
+                        currentPositionProvider = { currentPosition },
+                        bufferPositionProvider = { bufferPosition },
+                        duration = duration
+                    )
 
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -909,6 +873,57 @@ private fun IconButton(
                 modifier = Modifier.size(20.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun PlaybackTimeline(
+    currentPositionProvider: () -> Long,
+    bufferPositionProvider: () -> Long,
+    duration: Long,
+    modifier: Modifier = Modifier
+) {
+    val currentPosition = currentPositionProvider()
+    val bufferPosition = bufferPositionProvider()
+    
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = formatTime(currentPosition),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.8f)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color.White.copy(alpha = 0.2f))
+        ) {
+            val bufferFraction = if (duration > 0) bufferPosition.toFloat() / duration else 0f
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(bufferFraction)
+                    .height(6.dp)
+                    .background(Color.White.copy(alpha = 0.2f))
+            )
+            val progressFraction = if (duration > 0) currentPosition.toFloat() / duration else 0f
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progressFraction)
+                    .height(6.dp)
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = formatTime(duration),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.8f)
+        )
     }
 }
 

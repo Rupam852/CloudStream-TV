@@ -65,6 +65,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -316,7 +317,7 @@ fun HomeScreen(
                             ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            items(recentlyViewedList) { file ->
+                            items(recentlyViewedList, key = { it.id }) { file ->
                                 val icon = if (file.isVideo) Icons.Default.Movie else Icons.Default.Image
                                 TVWideCard(
                                     title = file.name,
@@ -466,7 +467,7 @@ fun HomeScreen(
                                     verticalArrangement = Arrangement.spacedBy(16.dp),
                                     contentPadding = PaddingValues(bottom = 24.dp)
                                 ) {
-                                    items(filteredFiles) { file ->
+                                    items(filteredFiles, key = { it.id }) { file ->
                                         val icon = when {
                                             file.isFolder -> Icons.Default.Folder
                                             file.isVideo -> Icons.Default.Movie
@@ -529,7 +530,7 @@ fun HomeScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                     contentPadding = PaddingValues(bottom = 24.dp)
                                 ) {
-                                    items(filteredFiles) { file ->
+                                    items(filteredFiles, key = { it.id }) { file ->
                                         val icon = when {
                                             file.isFolder -> Icons.Default.Folder
                                             file.isVideo -> Icons.Default.Movie
@@ -660,7 +661,7 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        itemsIndexed(savedFolders) { index, folder ->
+                        itemsIndexed(savedFolders, key = { _, folder -> folder.id }) { index, folder ->
                             val isLast = index == savedFolders.lastIndex
                             val folderModifier = if (isLast) {
                                 Modifier
@@ -1330,7 +1331,7 @@ fun HomeScreenBackdrop(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .alpha(0.12f)
+            .graphicsLayer { alpha = 0.12f }
     ) {
         AnimatedVisibility(
             visible = !backdropUrl.isNullOrBlank() && imageModel != null,
