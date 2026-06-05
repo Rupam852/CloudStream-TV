@@ -29,15 +29,19 @@ val DarkOnBackground = Color(0xFFF1F5F9)
 val DarkOnSurface = Color(0xFFFFFFFF)
 val DarkOnSurfaceVariant = Color(0xFF94A3B8)
 
-val LightBackground = Color(0xFFF7F4EB)    // Soft, warm cream background (eye-comfort)
-val LightSurface = Color(0xFFEDE9DD)       // Softer warm cream surface (replaces harsh white)
-val LightSurfaceVariant = Color(0xFFDFDACD) // Muted warm cream variant
-val LightPrimary = Color(0xFF1A365D)       // Muted deep navy blue (less blue-light glare)
-val LightSecondary = Color(0xFF4338CA)     // Muted indigo
-val LightBorder = Color(0xFFD5CDBF)        // Warm soft grey-beige border
-val LightOnBackground = Color(0xFF2A2825)  // Muted charcoal-brown for softer contrast
-val LightOnSurface = Color(0xFF2E2C29)     // Muted charcoal
-val LightOnSurfaceVariant = Color(0xFF6E685E) // Brownish-grey for subtext
+val LightBackground = Color(0xFFEFE9D9)    // Warm parchment paper background (eye-comfort)
+val LightSurface = Color(0xFFE4DEC9)       // Soft warm parchment surface
+val LightSurfaceVariant = Color(0xFFD9D3BE) // Muted warm sand variant
+val LightPrimary = Color(0xFF0F2C59)       // Deep navy blue (highly legible without blue-light glare)
+val LightSecondary = Color(0xFF5C3D2E)     // Muted terracotta/coffee brown
+val LightBorder = Color(0xFFC7C1AC)        // Soft muted border
+val LightOnBackground = Color(0xFF2C2720)  // Soft dark coffee for main text (low contrast strain)
+val LightOnSurface = Color(0xFF2C2720)     // Soft dark coffee for surfaces
+val LightOnSurfaceVariant = Color(0xFF5A5448) // Muted warm subtext
+val LightError = Color(0xFF9E2A2B)         // Soft warm brick red
+val LightErrorContainer = Color(0xFFF5E1DA) // Softer terracotta pink-beige container
+val LightOnError = Color(0xFFFFFFFF)
+val LightOnErrorContainer = Color(0xFF4A1516)
 
 val NeonCyanGlow = Color(0xFF00F5FF)
 val AccentPurpleGlow = Color(0xFF9F75FF)
@@ -61,7 +65,11 @@ private val LightTvColorScheme = lightColorScheme(
     surfaceVariant = LightSurfaceVariant,
     onBackground = LightOnBackground,
     onSurface = LightOnSurface,
-    onSurfaceVariant = LightOnSurfaceVariant
+    onSurfaceVariant = LightOnSurfaceVariant,
+    error = LightError,
+    errorContainer = LightErrorContainer,
+    onError = LightOnError,
+    onErrorContainer = LightOnErrorContainer
 )
 
 // Custom attributes

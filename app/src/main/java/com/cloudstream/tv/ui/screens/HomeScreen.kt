@@ -1170,7 +1170,7 @@ fun GoogleLoginOverlay(
                                 Box(
                                     modifier = Modifier
                                         .size(160.dp)
-                                        .background(Color.White, RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFFAF6EE), RoundedCornerShape(8.dp))
                                         .padding(8.dp)
                                 ) {
                                     AsyncImage(
