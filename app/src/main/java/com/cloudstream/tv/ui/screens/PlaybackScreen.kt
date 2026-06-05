@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.VolumeUp
+import android.media.audiofx.LoudnessEnhancer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -93,10 +95,42 @@ fun PlaybackScreen(
     var activeIndex by remember { mutableStateOf(playlist.indexOfFirst { it.id == currentFile.id }.coerceAtLeast(0)) }
     val activeFile = remember(activeIndex) { playlist.getOrNull(activeIndex) ?: currentFile }
 
+    var audioBoostLevel by remember { mutableStateOf(1) } // 0 = 100%, 1 = 120% (Soft), 2 = 150% (Medium), 3 = 200% (High)
+    var loudnessEnhancer by remember { mutableStateOf<LoudnessEnhancer?>(null) }
+    var audioSessionIdState by remember { mutableStateOf(0) }
+
+    fun applyAudioBoost(enhancer: LoudnessEnhancer?, level: Int) {
+        try {
+            if (enhancer != null) {
+                val gainMillibels = when (level) {
+                    0 -> 0      // 100%
+                    1 -> 600    // 120% (+6dB)
+                    2 -> 1200   // 150% (+12dB)
+                    3 -> 1800   // 200% (+18dB)
+                    else -> 0
+                }
+                enhancer.setTargetGain(gainMillibels)
+                enhancer.enabled = (gainMillibels > 0)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    LaunchedEffect(audioBoostLevel, loudnessEnhancer) {
+        applyAudioBoost(loudnessEnhancer, audioBoostLevel)
+    }
+
     // Initialize ExoPlayer
     val exoPlayer = remember {
         ExoPlayer.Builder(context).build().apply {
             playWhenReady = true
+            // Set audio attributes to optimize for TV movie playback
+            val attributes = androidx.media3.common.AudioAttributes.Builder()
+                .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+                .setContentType(androidx.media3.common.C.CONTENT_TYPE_MOVIE)
+                .build()
+            setAudioAttributes(attributes, true)
         }
     }
 
@@ -160,6 +194,20 @@ fun PlaybackScreen(
                 isPlaying = playWhenReady
             }
 
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                audioSessionIdState = audioSessionId
+                try {
+                    loudnessEnhancer?.release()
+                    if (audioSessionId != 0) {
+                        val enhancer = LoudnessEnhancer(audioSessionId)
+                        loudnessEnhancer = enhancer
+                        applyAudioBoost(enhancer, audioBoostLevel)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
             override fun onPlaybackStateChanged(state: Int) {
                 duration = exoPlayer.duration.coerceAtLeast(0L)
                 isBuffering = state == Player.STATE_BUFFERING
@@ -176,6 +224,11 @@ fun PlaybackScreen(
         exoPlayer.addListener(listener)
         onDispose {
             exoPlayer.removeListener(listener)
+            try {
+                loudnessEnhancer?.release()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             exoPlayer.release()
         }
     }
@@ -511,6 +564,51 @@ fun PlaybackScreen(
                             },
                             onClick = { toggleAspectRatio() }
                         )
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        // Audio Boost Toggle
+                        TVFocusableItem(
+                            onClick = {
+                                showControls()
+                                audioBoostLevel = (audioBoostLevel + 1) % 4
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+                            focusedContainerColor = MaterialTheme.colorScheme.primary
+                        ) { isFocused ->
+                            Box(
+                                modifier = Modifier
+                                    .height(36.dp)
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.VolumeUp,
+                                        contentDescription = null,
+                                        tint = if (isFocused) MaterialTheme.colorScheme.onPrimary else Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    val boostText = when (audioBoostLevel) {
+                                        0 -> "100%"
+                                        1 -> "120% (Soft)"
+                                        2 -> "150% (Medium)"
+                                        3 -> "200% (High)"
+                                        else -> "100%"
+                                    }
+                                    Text(
+                                        text = "Audio: $boostText",
+                                        color = if (isFocused) MaterialTheme.colorScheme.onPrimary else Color.White,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
 
                         Spacer(modifier = Modifier.width(16.dp))
 
