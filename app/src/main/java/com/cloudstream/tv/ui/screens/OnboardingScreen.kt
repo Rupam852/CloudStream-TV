@@ -67,6 +67,7 @@ fun OnboardingScreen(
     var validationState by remember { mutableStateOf<ValidationState>(ValidationState.Idle) }
     var showGoogleLoginDialog by remember { mutableStateOf(false) }
     var showApiKeyLoginDialog by remember { mutableStateOf(false) }
+    var showInitialWarningDialog by remember { mutableStateOf(true) }
     
     val coroutineScope = rememberCoroutineScope()
     
@@ -182,27 +183,6 @@ fun OnboardingScreen(
                 )
                 Text(
                     text = "The Google Drive folder must be shared as 'Anyone with the link' (Viewer), or you must grant access to it using the Google Account you authenticate with.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = 24.dp)
-                    .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "GOOGLE AUTHENTICATION WARNING",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                )
-                Text(
-                    text = "If Google Authenticate fails due to unverified app status or developer limits, please use your own Google Drive API Key to log in.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -413,6 +393,12 @@ fun OnboardingScreen(
             }
         )
     }
+
+    if (showInitialWarningDialog) {
+        InitialWarningOverlay(
+            onDismiss = { showInitialWarningDialog = false }
+        )
+    }
 }
 
 // Dialog-like overlay for API Key entry
@@ -521,6 +507,93 @@ fun ApiKeyLoginOverlay(
                                 )
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
                             color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Dialog-like overlay for initial Google OAuth limit warning popup
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+fun InitialWarningOverlay(
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnClickOutside = false
+        )
+    ) {
+        val okButtonFocusRequester = remember { FocusRequester() }
+
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(100)
+            okButtonFocusRequester.requestFocus()
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.75f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(460.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Google Authentication Notice",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "If standard Google Sign-In fails due to app verification or user limits (100-user limit), you can bypass it by using your own Google Drive API Key.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+
+                TVFocusableItem(
+                    onClick = onDismiss,
+                    modifier = Modifier.focusRequester(okButtonFocusRequester),
+                    shape = RoundedCornerShape(20.dp)
+                ) { isFocused ->
+                    Box(
+                        modifier = Modifier
+                            .height(40.dp)
+                            .background(
+                                if (isFocused) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                RoundedCornerShape(20.dp)
+                            )
+                            .padding(horizontal = 32.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Got It",
+                            color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold
                         )
                     }
