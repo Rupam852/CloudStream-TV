@@ -172,6 +172,27 @@ fun PlaybackScreen(
         }
     }
 
+    // Monitor audio session ID changes (both initial state and during playback transitions)
+    LaunchedEffect(exoPlayer) {
+        while (true) {
+            val currentSessionId = exoPlayer.audioSessionId
+            if (currentSessionId != 0 && currentSessionId != audioSessionIdState) {
+                Log.d("PlaybackScreen", "Detected audioSessionId change: $currentSessionId (was $audioSessionIdState)")
+                audioSessionIdState = currentSessionId
+                try {
+                    loudnessEnhancer?.release()
+                    val enhancer = LoudnessEnhancer(currentSessionId)
+                    loudnessEnhancer = enhancer
+                    applyAudioBoost(enhancer, audioBoostLevel)
+                    Log.d("PlaybackScreen", "LoudnessEnhancer attached to session $currentSessionId successfully")
+                } catch (e: Exception) {
+                    Log.e("PlaybackScreen", "Error attaching LoudnessEnhancer to session $currentSessionId", e)
+                }
+            }
+            delay(1000)
+        }
+    }
+
     // Playback and UI States
     var isPlaying by remember { mutableStateOf(exoPlayer.playWhenReady) }
     var currentPosition by remember { mutableLongStateOf(0L) }
@@ -400,6 +421,38 @@ fun PlaybackScreen(
                             } else {
                                 false
                             }
+                        }
+                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                            togglePlayPause()
+                            true
+                        }
+                        KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                            if (!isPlaying) {
+                                togglePlayPause()
+                            }
+                            true
+                        }
+                        KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                            if (isPlaying) {
+                                togglePlayPause()
+                            }
+                            true
+                        }
+                        KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                            seekForward()
+                            true
+                        }
+                        KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                            seekRewind()
+                            true
+                        }
+                        KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                            skipNext()
+                            true
+                        }
+                        KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+                            skipPrevious()
+                            true
                         }
                         else -> false
                     }
@@ -710,40 +763,40 @@ fun PlaybackScreen(
                     }
                 }
             }
-            // 3. Playback Action Toast / Notification Overlay (Renders on top of everything)
-            AnimatedVisibility(
-                visible = !toastMessage.isNullOrBlank(),
-                enter = fadeIn(animationSpec = tween(200)),
-                exit = fadeOut(animationSpec = tween(200)),
-                modifier = Modifier.align(Alignment.Center)
-            ) {
-                toastMessage?.let { msg ->
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(Color.Black.copy(alpha = 0.8f))
-                            .padding(horizontal = 24.dp, vertical = 12.dp),
-                        contentAlignment = Alignment.Center
+        }
+        // 3. Playback Action Toast / Notification Overlay (Renders on top of everything, even when controls are hidden)
+        AnimatedVisibility(
+            visible = !toastMessage.isNullOrBlank(),
+            enter = fadeIn(animationSpec = tween(200)),
+            exit = fadeOut(animationSpec = tween(200)),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            toastMessage?.let { msg ->
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(Color.Black.copy(alpha = 0.8f))
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            toastIcon?.let { icon ->
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                            Text(
-                                text = msg,
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                        toastIcon?.let { icon ->
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
+                        Text(
+                            text = msg,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
