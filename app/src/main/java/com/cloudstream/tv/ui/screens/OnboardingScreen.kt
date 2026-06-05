@@ -262,6 +262,7 @@ fun OnboardingScreen(
             ) {
                 TVFocusableItem(
                     onClick = {
+                        if (validationState == ValidationState.Validating) return@TVFocusableItem
                         if (urlInput.isBlank()) {
                             validationState = ValidationState.Error("Please enter a link or folder ID.")
                             return@TVFocusableItem
@@ -305,6 +306,7 @@ fun OnboardingScreen(
 
                 TVFocusableItem(
                     onClick = {
+                        if (validationState == ValidationState.Validating) return@TVFocusableItem
                         if (urlInput.isBlank()) {
                             validationState = ValidationState.Error("Please enter a link or folder ID.")
                             return@TVFocusableItem

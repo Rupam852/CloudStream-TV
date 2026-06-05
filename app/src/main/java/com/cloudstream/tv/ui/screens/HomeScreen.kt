@@ -130,6 +130,15 @@ fun HomeScreen(
     // Active folder for Rename/Remove options dialog
     var folderOptionsActiveFolder by remember { mutableStateOf<DriveLink?>(null) }
 
+    var oauthToken by remember { mutableStateOf<String?>(null) }
+    var apiKey by remember { mutableStateOf<String?>(null) }
+
+    // Resolve tokens
+    LaunchedEffect(currentFolderId) {
+        oauthToken = if (repository.isLoggedIn()) repository.getAccessToken() else null
+        apiKey = repository.getApiKey()
+    }
+
     val foldersListTriggerFocusRequester = remember { FocusRequester() }
     val lastFolderFocusRequester = remember { FocusRequester() }
     val addLinkFocusRequester = remember { FocusRequester() }
@@ -158,8 +167,8 @@ fun HomeScreen(
         coroutineScope.launch {
             try {
                 val results = withContext(Dispatchers.IO) {
-                    val oauthToken = repository.getAccessToken()
-                    GoogleDriveClient.fetchFolderContents(folderId, repository.getApiKey(), oauthToken)
+                    val token = repository.getAccessToken()
+                    GoogleDriveClient.fetchFolderContents(folderId, repository.getApiKey(), token)
                 }
                 filesList = results
             } catch (e: Exception) {
@@ -183,9 +192,10 @@ fun HomeScreen(
     }
 
     var showExitDialog by remember { mutableStateOf(false) }
+    val isOverlayActive = showAddFolderDialog || showExitDialog || (folderOptionsActiveFolder != null)
 
     // Handle physical TV Back Button
-    BackHandler(enabled = true) {
+    BackHandler(enabled = !isOverlayActive) {
         if (folderNavigationStack.isNotEmpty()) {
             val previousFolder = folderNavigationStack.removeAt(folderNavigationStack.lastIndex)
             currentFolderId = previousFolder
@@ -213,7 +223,11 @@ fun HomeScreen(
                 .background(MaterialTheme.colorScheme.background)
         ) {
             // 1. Dynamic Backdrop Blur of Selected Card (using provider to isolate recomposition)
-            HomeScreenBackdrop(backdropUrlProvider = { backdropUrl })
+            HomeScreenBackdrop(
+                backdropUrlProvider = { backdropUrl },
+                oauthToken = oauthToken,
+                apiKey = apiKey
+            )
 
             // 2. Main Row Layout: Sidebar + Content
             // 2. Main Layout: Sidebar (Overlay) + Content (Fixed offset to avoid layout resizing recalculations)
@@ -489,7 +503,9 @@ fun HomeScreen(
                                             },
                                             onFocus = {
                                                 // Update background image dynamic glow preview
-                                                targetBackdropUrl = if (file.isFolder) null else file.thumbnailUrl ?: file.streamUrl
+                                                targetBackdropUrl = if (file.isFolder) null else {
+                                                    file.thumbnailUrl ?: if (file.isImage) file.streamUrl else null
+                                                }
                                             },
                                             iconTint = if (file.isFolder) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
                                             onLongClick = if (file.isFolder) {
@@ -540,7 +556,9 @@ fun HomeScreen(
                                                 }
                                             },
                                             onFocus = {
-                                                targetBackdropUrl = if (file.isFolder) null else file.thumbnailUrl ?: file.streamUrl
+                                                targetBackdropUrl = if (file.isFolder) null else {
+                                                    file.thumbnailUrl ?: if (file.isImage) file.streamUrl else null
+                                                }
                                             },
                                             shape = RoundedCornerShape(8.dp),
                                             scaleOnFocus = 1.02f,
@@ -885,6 +903,7 @@ fun AddFolderOverlay(
                         Spacer(modifier = Modifier.width(12.dp))
                         TVFocusableItem(
                             onClick = {
+                                if (isVerifying) return@TVFocusableItem
                                 if (urlInput.isBlank()) {
                                     errorMsg = "Link cannot be empty."
                                     return@TVFocusableItem
@@ -1261,25 +1280,50 @@ fun GoogleLoginOverlay(
 @Composable
 fun HomeScreenBackdrop(
     backdropUrlProvider: () -> String?,
+    oauthToken: String?,
+    apiKey: String?,
     modifier: Modifier = Modifier
 ) {
     val backdropUrl = backdropUrlProvider()
+    val context = LocalContext.current
+    val imageModel = remember(backdropUrl, oauthToken, apiKey) {
+        val url = backdropUrl
+        if (url == null) {
+            null
+        } else if (url.startsWith("http") && !url.contains("googleapis.com")) {
+            url
+        } else {
+            val builder = coil.request.ImageRequest.Builder(context)
+                .data(url)
+                .crossfade(true)
+                .crossfade(300)
+            
+            if (oauthToken != null) {
+                builder.setHeader("Authorization", "Bearer $oauthToken")
+            } else if (!apiKey.isNullOrBlank()) {
+                val finalUrl = if (url.contains("googleapis.com") && !url.contains("key=")) {
+                    if (url.contains("?")) "$url&key=$apiKey" else "$url?key=$apiKey"
+                } else {
+                    url
+                }
+                builder.data(finalUrl)
+            }
+            builder.build()
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .alpha(0.12f)
     ) {
         AnimatedVisibility(
-            visible = !backdropUrl.isNullOrBlank(),
+            visible = !backdropUrl.isNullOrBlank() && imageModel != null,
             enter = fadeIn(animationSpec = tween(600)),
             exit = fadeOut(animationSpec = tween(600))
         ) {
             AsyncImage(
-                model = coil.request.ImageRequest.Builder(LocalContext.current)
-                    .data(backdropUrl)
-                    .crossfade(true)
-                    .crossfade(300)
-                    .build(),
+                model = imageModel,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

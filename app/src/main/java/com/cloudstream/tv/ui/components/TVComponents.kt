@@ -81,6 +81,7 @@ fun TVFocusableItem(
     onLongClick: (() -> Unit)? = null,
     containerColor: Color = Color.Transparent,
     focusedContainerColor: Color = Color.Transparent,
+    enabled: Boolean = true,
     content: @Composable (isFocused: Boolean) -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -95,7 +96,7 @@ fun TVFocusableItem(
     val coroutineScope = rememberCoroutineScope()
     var longClickJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
-    val itemModifier = if (onLongClick != null) {
+    val itemModifier = if (onLongClick != null && enabled) {
         modifier.onPreviewKeyEvent { keyEvent ->
             val keyCode = keyEvent.nativeKeyEvent.keyCode
             val action = keyEvent.nativeKeyEvent.action
@@ -130,6 +131,7 @@ fun TVFocusableItem(
 
     Surface(
         onClick = if (onLongClick != null) { {} } else onClick,
+        enabled = enabled,
         scale = ClickableSurfaceDefaults.scale(focusedScale = scaleOnFocus),
         shape = ClickableSurfaceDefaults.shape(shape = shape),
         border = ClickableSurfaceDefaults.border(

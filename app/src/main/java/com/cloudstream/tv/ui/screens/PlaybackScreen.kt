@@ -313,6 +313,12 @@ fun PlaybackScreen(
                     }
                 }
             }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                Log.e("PlaybackScreen", "Player error: ", error)
+                isBuffering = false
+                showToast("Playback error: ${error.localizedMessage ?: "Unknown error"}", Icons.Default.Pause)
+            }
         }
         exoPlayer.addListener(listener)
         onDispose {
@@ -868,6 +874,7 @@ private fun IconButton(
 ) {
     TVFocusableItem(
         onClick = onClick,
+        enabled = enabled,
         shape = CircleShape,
         modifier = Modifier.alpha(if (enabled) 1.0f else 0.4f),
         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
