@@ -24,6 +24,7 @@ class DriveRepository(context: Context) {
         private const val KEY_OAUTH_CLIENT_ID = "oauth_client_id"
         private const val KEY_OAUTH_CLIENT_SECRET = "oauth_client_secret"
         private const val KEY_WARNING_DISMISSED = "warning_notice_dismissed"
+        private const val KEY_PLAYBACK_POSITIONS = "playback_positions"
     }
 
     // --- Saved Folder Links ---
@@ -110,6 +111,39 @@ class DriveRepository(context: Context) {
 
     fun clearRecentlyViewed() {
         prefs.edit().remove(KEY_RECENTLY_VIEWED).apply()
+    }
+
+    // --- Playback Resume Positions ---
+    private fun getPlaybackPositionsMap(): MutableMap<String, Long> {
+        val json = prefs.getString(KEY_PLAYBACK_POSITIONS, null) ?: return mutableMapOf()
+        return try {
+            val type = object : TypeToken<MutableMap<String, Long>>() {}.type
+            gson.fromJson(json, type) ?: mutableMapOf()
+        } catch (e: Exception) {
+            mutableMapOf()
+        }
+    }
+
+    fun getPlaybackPosition(fileId: String): Long {
+        return getPlaybackPositionsMap()[fileId] ?: 0L
+    }
+
+    fun savePlaybackPosition(fileId: String, position: Long) {
+        val map = getPlaybackPositionsMap()
+        map[fileId] = position
+        prefs.edit().putString(KEY_PLAYBACK_POSITIONS, gson.toJson(map)).apply()
+    }
+
+    fun clearPlaybackPosition(fileId: String) {
+        val map = getPlaybackPositionsMap()
+        if (map.containsKey(fileId)) {
+            map.remove(fileId)
+            prefs.edit().putString(KEY_PLAYBACK_POSITIONS, gson.toJson(map)).apply()
+        }
+    }
+
+    fun clearAllPlaybackPositions() {
+        prefs.edit().remove(KEY_PLAYBACK_POSITIONS).apply()
     }
 
     // --- Preferences & Settings ---

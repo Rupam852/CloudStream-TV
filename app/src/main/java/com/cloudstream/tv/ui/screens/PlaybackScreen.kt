@@ -223,6 +223,22 @@ fun PlaybackScreen(
         isResolving = false
     }
 
+    // Track and save playback position when activeFile changes (e.g. Next/Previous transitions)
+    DisposableEffect(activeFile) {
+        onDispose {
+            try {
+                val currentPos = exoPlayer.currentPosition
+                val totalDur = exoPlayer.duration
+                if (totalDur > 0 && currentPos > 3000 && currentPos < totalDur * 0.95) {
+                    repository.savePlaybackPosition(activeFile.id, currentPos)
+                    Log.d("PlaybackScreen", "Saved transition position $currentPos for file ${activeFile.name}")
+                }
+            } catch (e: Exception) {
+                Log.e("PlaybackScreen", "Failed to save position on transition", e)
+            }
+        }
+    }
+
     // Load active file into player when resolved URL is ready
     LaunchedEffect(resolvedUrl, oauthToken) {
         val url = resolvedUrl ?: return@LaunchedEffect
@@ -244,6 +260,15 @@ fun PlaybackScreen(
         
         exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
+
+        // Seek to saved position if it exists (only if played for more than 3 seconds)
+        val savedPos = repository.getPlaybackPosition(activeFile.id)
+        if (savedPos > 3000) {
+            exoPlayer.seekTo(savedPos)
+            val timeString = formatTime(savedPos)
+            showToast("Resumed from $timeString", Icons.Default.PlayArrow)
+        }
+
         exoPlayer.play()
     }
 
@@ -274,6 +299,8 @@ fun PlaybackScreen(
                 duration = exoPlayer.duration.coerceAtLeast(0L)
                 isBuffering = state == Player.STATE_BUFFERING
                 if (state == Player.STATE_ENDED) {
+                    // Video has completed, so clear saved resume progress
+                    repository.clearPlaybackPosition(activeFile.id)
                     if (activeIndex < playlist.size - 1) {
                         activeIndex++
                     } else {
@@ -285,6 +312,19 @@ fun PlaybackScreen(
         }
         exoPlayer.addListener(listener)
         onDispose {
+            try {
+                val currentPos = exoPlayer.currentPosition
+                val totalDur = exoPlayer.duration
+                if (totalDur > 0 && currentPos > 3000 && currentPos < totalDur * 0.95) {
+                    repository.savePlaybackPosition(activeFile.id, currentPos)
+                    Log.d("PlaybackScreen", "Saved exit position $currentPos for file ${activeFile.name}")
+                } else {
+                    repository.clearPlaybackPosition(activeFile.id)
+                }
+            } catch (e: Exception) {
+                Log.e("PlaybackScreen", "Failed to save position on exit", e)
+            }
+
             exoPlayer.removeListener(listener)
             try {
                 loudnessEnhancer?.release()
@@ -295,11 +335,21 @@ fun PlaybackScreen(
         }
     }
 
-    // Periodically update playback positions (seekbar timeline)
+    // Periodically update playback positions (seekbar timeline) and save progress every 5 seconds
     LaunchedEffect(isPlaying) {
+        var saveCounter = 0
         while (isPlaying) {
             currentPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
             bufferPosition = exoPlayer.bufferedPosition.coerceAtLeast(0L)
+            
+            saveCounter++
+            if (saveCounter >= 20) { // 20 * 250ms = 5000ms (5 seconds)
+                saveCounter = 0
+                val totalDur = exoPlayer.duration
+                if (totalDur > 0 && currentPosition > 3000 && currentPosition < totalDur * 0.95) {
+                    repository.savePlaybackPosition(activeFile.id, currentPosition)
+                }
+            }
             delay(250)
         }
     }
