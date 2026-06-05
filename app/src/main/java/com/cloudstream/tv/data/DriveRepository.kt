@@ -173,15 +173,24 @@ class DriveRepository(context: Context) {
         if (isExpired && refreshToken != null) {
             val clientId = getOAuthClientId()
             val clientSecret = getOAuthClientSecret()
-            val tokenResponse = com.cloudstream.tv.network.GoogleDriveClient.refreshAccessToken(clientId, clientSecret, refreshToken)
-            if (tokenResponse != null && tokenResponse.access_token != null) {
-                val newAccessToken = tokenResponse.access_token
-                val newExpiry = System.currentTimeMillis() + (tokenResponse.expires_in ?: 3600) * 1000
-                saveOAuthTokens(newAccessToken, refreshToken, newExpiry, getOAuthEmail())
-                return newAccessToken
-            } else {
-                clearOAuthTokens()
-                return null
+            when (val result = com.cloudstream.tv.network.GoogleDriveClient.refreshAccessToken(clientId, clientSecret, refreshToken)) {
+                is com.cloudstream.tv.network.TokenResult.Success -> {
+                    val tokenResponse = result.response
+                    if (tokenResponse.access_token != null) {
+                        val newAccessToken = tokenResponse.access_token
+                        val newExpiry = System.currentTimeMillis() + (tokenResponse.expires_in ?: 3600) * 1000
+                        saveOAuthTokens(newAccessToken, refreshToken, newExpiry, getOAuthEmail())
+                        return newAccessToken
+                    }
+                }
+                is com.cloudstream.tv.network.TokenResult.InvalidCredentials -> {
+                    clearOAuthTokens()
+                    return null
+                }
+                else -> {
+                    // Keep tokens on network/temporary errors and return the expired access token as fallback
+                    return accessToken
+                }
             }
         }
         

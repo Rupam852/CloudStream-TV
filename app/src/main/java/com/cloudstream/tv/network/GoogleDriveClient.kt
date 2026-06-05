@@ -541,7 +541,7 @@ object GoogleDriveClient {
         }
     }
 
-    suspend fun refreshAccessToken(clientId: String, clientSecret: String, refreshToken: String): TokenResponse? = withContext(Dispatchers.IO) {
+    suspend fun refreshAccessToken(clientId: String, clientSecret: String, refreshToken: String): TokenResult = withContext(Dispatchers.IO) {
         val formBody = FormBody.Builder()
             .add("client_id", clientId)
             .add("client_secret", clientSecret)
@@ -554,13 +554,22 @@ object GoogleDriveClient {
             .build()
         try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
-                val body = response.body?.string() ?: return@withContext null
-                Gson().fromJson(body, TokenResponse::class.java)
+                val body = response.body?.string() ?: ""
+                if (response.isSuccessful) {
+                    val tokenResponse = Gson().fromJson(body, TokenResponse::class.java)
+                    TokenResult.Success(tokenResponse)
+                } else {
+                    Log.e(TAG, "Refresh token failed with HTTP ${response.code}: $body")
+                    if (response.code in 400..499) {
+                        TokenResult.InvalidCredentials
+                    } else {
+                        TokenResult.TemporaryError
+                    }
+                }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to refresh token", e)
-            null
+            Log.e(TAG, "Failed to refresh token due to connection error", e)
+            TokenResult.NetworkError
         }
     }
 
@@ -572,7 +581,7 @@ object GoogleDriveClient {
         try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@withContext null
-                val body = response.body?.string() ?: return@withContext null
+                val body = response.body?.string() ?: null
                 Gson().fromJson(body, UserInfoResponse::class.java).email
             }
         } catch (e: Exception) {
@@ -580,6 +589,13 @@ object GoogleDriveClient {
             null
         }
     }
+}
+
+sealed class TokenResult {
+    data class Success(val response: TokenResponse) : TokenResult()
+    object InvalidCredentials : TokenResult()
+    object TemporaryError : TokenResult()
+    object NetworkError : TokenResult()
 }
 
 data class DeviceCodeResponse(
