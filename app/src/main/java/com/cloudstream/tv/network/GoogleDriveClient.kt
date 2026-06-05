@@ -294,7 +294,7 @@ object GoogleDriveClient {
             val filesMap = mutableMapOf<String, DriveFile>()
 
             // Regex 1: Scan for JSON pattern with parent array (handles escaped/unescaped quotes)
-            val patternJson1 = Pattern.compile("""\[\\?"([a-zA-Z0-9_-]{28,45})\\?",\[[^\]]*\],\\?"([^\\"]+)\\?",\\?"([^\\"]+)\\?"""")
+            val patternJson1 = Pattern.compile("""\[\\?"([a-zA-Z0-9_-]{28,45})\\?",\[[^\]]*\],\\?"((?:[^"\\]|\\.)+)\\?",\\?"([^\\"]+)\\?"""")
             val matcherJson1 = patternJson1.matcher(html)
             while (matcherJson1.find()) {
                 val id = matcherJson1.group(1)!!
@@ -310,7 +310,7 @@ object GoogleDriveClient {
             }
 
             // Regex 2: Scan for JSON pattern with null parent (handles escaped/unescaped quotes)
-            val patternJson2 = Pattern.compile("""\[\\?"([a-zA-Z0-9_-]{28,45})\\?",null,\\?"([^\\"]+)\\?",\\?"([^\\"]+)\\?"""")
+            val patternJson2 = Pattern.compile("""\[\\?"([a-zA-Z0-9_-]{28,45})\\?",null,\\?"((?:[^"\\]|\\.)+)\\?",\\?"([^\\"]+)\\?"""")
             val matcherJson2 = patternJson2.matcher(html)
             while (matcherJson2.find()) {
                 val id = matcherJson2.group(1)!!
