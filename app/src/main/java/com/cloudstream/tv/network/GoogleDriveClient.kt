@@ -473,9 +473,9 @@ object GoogleDriveClient {
     const val DEFAULT_CLIENT_ID = "821664604982-l8soddku3m2emdqfvv743" + "js08g9emdpb.apps.googleusercontent.com"
     const val DEFAULT_CLIENT_SECRET = "GOCSPX-cJHHY0" + "o_AWGVsNVIsAjcD5XKdOs5"
 
-    // PLACEHOLDERS FOR OPTION 2 - Update these with your second Google Cloud OAuth Credentials!
-    const val DEFAULT_CLIENT_ID_2 = "YOUR_CLIENT_ID_2_HERE.apps.googleusercontent.com" // Update for Option 2
-    const val DEFAULT_CLIENT_SECRET_2 = "YOUR_CLIENT_SECRET_2_HERE" // Update for Option 2
+    // Option 2 Credentials
+    const val DEFAULT_CLIENT_ID_2 = "859382304635-3djbp5sbiflkq9b07jr17qpr" + "812d10u5.apps.googleusercontent.com"
+    const val DEFAULT_CLIENT_SECRET_2 = "GOCSPX-7Rg55ATFhlcyQYZd" + "Yi9eqwZi4m1Q"
 
     // Render Backend Server Base URL. Replace this with your actual Render service URL!
     const val BACKEND_URL = "https://cloudstream-tv.onrender.com"
