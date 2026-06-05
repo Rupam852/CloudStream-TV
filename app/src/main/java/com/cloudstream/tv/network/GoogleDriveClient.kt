@@ -59,43 +59,10 @@ object GoogleDriveClient {
             return@withContext fileId
         }
         if (!oauthToken.isNullOrBlank()) {
-            val apiUrl = "https://www.googleapis.com/drive/v3/files/$fileId?alt=media"
-            val request = Request.Builder()
-                .url(apiUrl)
-                .header("Authorization", "Bearer $oauthToken")
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                .build()
-            try {
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val finalUrl = response.request.url.toString()
-                        Log.d(TAG, "OAuth API URL resolved to final stream: $finalUrl")
-                        return@withContext finalUrl
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error resolving OAuth API URL to final URL", e)
-            }
-            return@withContext apiUrl
+            return@withContext "https://www.googleapis.com/drive/v3/files/$fileId?alt=media"
         }
         if (!apiKey.isNullOrBlank()) {
-            val apiUrl = "https://www.googleapis.com/drive/v3/files/$fileId?alt=media&key=$apiKey"
-            val request = Request.Builder()
-                .url(apiUrl)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                .build()
-            try {
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val finalUrl = response.request.url.toString()
-                        Log.d(TAG, "API Key URL resolved to final stream: $finalUrl")
-                        return@withContext finalUrl
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error resolving API Key URL to final URL", e)
-            }
-            return@withContext apiUrl
+            return@withContext "https://www.googleapis.com/drive/v3/files/$fileId?alt=media&key=$apiKey"
         }
         val initialUrl = "https://drive.google.com/uc?export=download&id=$fileId"
         val request = Request.Builder()
@@ -108,20 +75,12 @@ object GoogleDriveClient {
                 val contentType = response.header("Content-Type") ?: ""
                 val finalUrl = response.request.url.toString()
                 
-                if (!contentType.contains("text/html") && !finalUrl.contains("confirm=")) {
+                if (finalUrl.contains("confirm=")) {
                     return@withContext finalUrl
                 }
-
-                if (finalUrl.contains("confirm=")) {
-                    val confirmRequest = Request.Builder()
-                        .url(finalUrl)
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                        .build()
-                    client.newCall(confirmRequest).execute().use { confirmResponse ->
-                        val resolved = confirmResponse.request.url.toString()
-                        Log.d(TAG, "Confirm URL resolved to final stream: $resolved")
-                        return@withContext resolved
-                    }
+                
+                if (!contentType.contains("text/html")) {
+                    return@withContext finalUrl
                 }
                 
                 val body = response.body?.string() ?: ""
@@ -130,16 +89,7 @@ object GoogleDriveClient {
                 val matcher = confirmPattern.matcher(body)
                 if (matcher.find()) {
                     val token = matcher.group(1)
-                    val confirmUrl = "https://drive.google.com/uc?export=download&id=$fileId&confirm=$token"
-                    val confirmRequest = Request.Builder()
-                        .url(confirmUrl)
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                        .build()
-                    client.newCall(confirmRequest).execute().use { confirmResponse ->
-                        val resolved = confirmResponse.request.url.toString()
-                        Log.d(TAG, "Confirm token from body resolved to final stream: $resolved")
-                        return@withContext resolved
-                    }
+                    return@withContext "https://drive.google.com/uc?export=download&id=$fileId&confirm=$token"
                 }
                 
                 val cookies = response.headers("Set-Cookie")
@@ -147,16 +97,7 @@ object GoogleDriveClient {
                     val cookieMatcher = confirmPattern.matcher(cookie)
                     if (cookieMatcher.find()) {
                         val token = cookieMatcher.group(1)
-                        val confirmUrl = "https://drive.google.com/uc?export=download&id=$fileId&confirm=$token"
-                        val confirmRequest = Request.Builder()
-                            .url(confirmUrl)
-                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                            .build()
-                        client.newCall(confirmRequest).execute().use { confirmResponse ->
-                            val resolved = confirmResponse.request.url.toString()
-                            Log.d(TAG, "Confirm token from cookie resolved to final stream: $resolved")
-                            return@withContext resolved
-                        }
+                        return@withContext "https://drive.google.com/uc?export=download&id=$fileId&confirm=$token"
                     }
                 }
                 
