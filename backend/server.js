@@ -128,7 +128,7 @@ app.get('/api/session', (req, res) => {
 app.get('/api/login', (req, res) => {
     let sessionId = req.query.session;
     if (sessionId && typeof sessionId === 'string') {
-        sessionId = sessionId.split(/[?&]/)[0].trim();
+        sessionId = sessionId.split(/[?&]/)[0].trim().toUpperCase();
     }
     if (!sessionId || !sessions.has(sessionId)) {
         return res.status(400).send('Invalid or expired login session. Please close the login screen on your TV and open it again.');
@@ -157,7 +157,10 @@ app.get('/api/login', (req, res) => {
 // Endpoint 3: Google redirect callback page
 app.get('/api/callback', async (req, res) => {
     const code = req.query.code;
-    const sessionId = req.query.state;
+    let sessionId = req.query.state;
+    if (sessionId && typeof sessionId === 'string') {
+        sessionId = sessionId.trim().toUpperCase();
+    }
 
     if (!code || !sessionId || !sessions.has(sessionId)) {
         return res.status(400).send('Authentication expired or invalid request parameters.');
@@ -225,7 +228,7 @@ app.get('/api/callback', async (req, res) => {
 app.get('/api/poll', (req, res) => {
     let sessionId = req.query.session;
     if (sessionId && typeof sessionId === 'string') {
-        sessionId = sessionId.split(/[?&]/)[0].trim();
+        sessionId = sessionId.split(/[?&]/)[0].trim().toUpperCase();
     }
     if (!sessionId || !sessions.has(sessionId)) {
         return res.json({ status: 'expired' });
