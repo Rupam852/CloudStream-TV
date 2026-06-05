@@ -33,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -64,6 +66,7 @@ fun OnboardingScreen(
     var folderNameInput by remember { mutableStateOf("") }
     var validationState by remember { mutableStateOf<ValidationState>(ValidationState.Idle) }
     var showGoogleLoginDialog by remember { mutableStateOf(false) }
+    var showApiKeyLoginDialog by remember { mutableStateOf(false) }
     
     val coroutineScope = rememberCoroutineScope()
     
@@ -184,6 +187,27 @@ fun OnboardingScreen(
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
+            Spacer(modifier = Modifier.height(16.dp))
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 24.dp)
+                    .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "GOOGLE AUTHENTICATION WARNING",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                Text(
+                    text = "If Google Authenticate fails due to unverified app status or developer limits, please use your own Google Drive API Key to log in.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
         }
 
         // Vertical divider
@@ -290,6 +314,43 @@ fun OnboardingScreen(
                         )
                     }
                 }
+
+                Text(
+                    text = "OR",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                    fontWeight = FontWeight.Bold
+                )
+
+                TVFocusableItem(
+                    onClick = {
+                        if (urlInput.isBlank()) {
+                            validationState = ValidationState.Error("Please enter a link or folder ID.")
+                            return@TVFocusableItem
+                        }
+                        showApiKeyLoginDialog = true
+                    },
+                    shape = RoundedCornerShape(20.dp)
+                ) { isFocused ->
+                    Box(
+                        modifier = Modifier
+                            .height(40.dp)
+                            .background(
+                                if (isFocused) MaterialTheme.colorScheme.secondary
+                                else MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
+                                RoundedCornerShape(20.dp)
+                            )
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Link Folder with Own Drive API Key",
+                            color = if (isFocused) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.secondary,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -339,6 +400,132 @@ fun OnboardingScreen(
                 startValidation(urlInput, folderNameInput)
             }
         )
+    }
+
+    if (showApiKeyLoginDialog) {
+        ApiKeyLoginOverlay(
+            onDismiss = { showApiKeyLoginDialog = false },
+            onSubmit = { key ->
+                showApiKeyLoginDialog = false
+                repository.setApiKey(key)
+                startValidation(urlInput, folderNameInput)
+            }
+        )
+    }
+}
+
+// Dialog-like overlay for API Key entry
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+fun ApiKeyLoginOverlay(
+    onDismiss: () -> Unit,
+    onSubmit: (String) -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnClickOutside = false
+        )
+    ) {
+        var apiKeyInput by remember { mutableStateOf("") }
+        val focusRequester = remember { FocusRequester() }
+        val submitFocusRequester = remember { FocusRequester() }
+
+        LaunchedEffect(Unit) {
+            focusRequester.requestFocus()
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.75f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(440.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(24.dp)
+            ) {
+                Text(
+                    text = "Enter Google Drive API Key",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "This allows bypassing Google Authentication limits by using your own Google Cloud Drive API key.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "API Key",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                TVSearchBar(
+                    value = apiKeyInput,
+                    onValueChange = { apiKeyInput = it },
+                    focusRequester = focusRequester,
+                    onSearchAction = { submitFocusRequester.requestFocus() }
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TVFocusableItem(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(8.dp)
+                    ) { isFocused ->
+                        Text(
+                            text = "Cancel",
+                            modifier = Modifier
+                                .background(
+                                    if (isFocused) MaterialTheme.colorScheme.surfaceVariant
+                                    else Color.Transparent,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TVFocusableItem(
+                        onClick = {
+                            if (apiKeyInput.isNotBlank()) {
+                                onSubmit(apiKeyInput.trim())
+                            }
+                        },
+                        modifier = Modifier.focusRequester(submitFocusRequester),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { isFocused ->
+                        Text(
+                            text = "Link Folder",
+                            modifier = Modifier
+                                .background(
+                                    if (isFocused) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

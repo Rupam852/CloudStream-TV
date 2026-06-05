@@ -729,6 +729,7 @@ fun HomeScreen(
                         onSelect = {
                             // Reset credentials
                             repository.clearOAuthTokens()
+                            repository.setApiKey(null)
                             // Delete all saved links
                             repository.getSavedLinks().forEach { repository.deleteLink(it.id) }
                             // Clear history
