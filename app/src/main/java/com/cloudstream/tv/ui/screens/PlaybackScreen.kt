@@ -255,7 +255,11 @@ fun PlaybackScreen(
             }
         }
         
-        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+        val extractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory().apply {
+            setConstantBitrateSeekingEnabled(true)
+        }
+
+        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory, extractorsFactory)
             .createMediaSource(mediaItem)
         
         exoPlayer.setMediaSource(mediaSource)
