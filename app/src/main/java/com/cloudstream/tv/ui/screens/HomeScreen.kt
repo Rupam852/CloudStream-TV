@@ -960,6 +960,7 @@ fun GoogleLoginOverlay(
         var verificationUrl by remember { mutableStateOf("") }
         var isPolling by remember { mutableStateOf(false) }
         var errorMsg by remember { mutableStateOf<String?>(null) }
+        var timeRemainingState by remember { mutableStateOf(300) }
         
         var retryKey by remember { mutableStateOf(0) }
 
@@ -977,13 +978,12 @@ fun GoogleLoginOverlay(
                 userCode = response.user_code
                 verificationUrl = response.verification_url
                 
-                var timeRemaining = response.expires_in
+                timeRemainingState = response.expires_in
                 val interval = response.interval.toLong()
                 val clientSecret = repository.getOAuthClientSecret()
                 
-                while (isPolling && timeRemaining > 0) {
+                while (isPolling && timeRemainingState > 0) {
                     kotlinx.coroutines.delay(interval * 1000)
-                    timeRemaining -= interval.toInt()
                     
                     val tokenResponse = com.cloudstream.tv.network.GoogleDriveClient.pollDeviceToken(clientId, clientSecret, response.device_code)
                     if (tokenResponse != null) {
@@ -1009,13 +1009,22 @@ fun GoogleLoginOverlay(
                         }
                     }
                 }
-                if (timeRemaining <= 0 && isPolling) {
+                if (timeRemainingState <= 0 && isPolling) {
                     errorMsg = "Code expired. Please try again."
                     isPolling = false
                 }
             } catch (e: Exception) {
                 errorMsg = e.message ?: "Failed to communicate with Google authentication servers."
                 isPolling = false
+            }
+        }
+
+        LaunchedEffect(userCode) {
+            if (userCode.isNotBlank()) {
+                while (timeRemainingState > 0 && isPolling) {
+                    kotlinx.coroutines.delay(1000)
+                    timeRemainingState -= 1
+                }
             }
         }
 
@@ -1142,6 +1151,16 @@ fun GoogleLoginOverlay(
                                         style = MaterialTheme.typography.labelMedium
                                     )
                                 }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                val minutes = timeRemainingState / 60
+                                val seconds = timeRemainingState % 60
+                                val timeFormatted = String.format("%02d:%02d", minutes, seconds)
+                                Text(
+                                    text = "Code expires in: $timeFormatted",
+                                    color = if (timeRemainingState < 60) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
 
                             Column(
