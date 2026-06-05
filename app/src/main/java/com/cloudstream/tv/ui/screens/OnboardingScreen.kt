@@ -286,7 +286,9 @@ fun OnboardingScreen(
                 }
             } else {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         text = "If Option 1 fails or reaches its user limit, please try Option 2.",
@@ -295,74 +297,81 @@ fun OnboardingScreen(
                         modifier = Modifier.padding(bottom = 2.dp)
                     )
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Button Option 1
-                        TVFocusableItem(
-                            onClick = {
-                                if (validationState == ValidationState.Validating) return@TVFocusableItem
-                                if (urlInput.isBlank()) {
+                    // Button Option 1
+                    TVFocusableItem(
+                        onClick = {
+                            if (validationState == ValidationState.Validating) return@TVFocusableItem
+                            if (urlInput.isBlank()) {
                                     validationState = ValidationState.Error("Please enter a link or folder ID.")
                                     return@TVFocusableItem
-                                }
-                                showGoogleLoginDialogOption = 1
-                            },
-                            modifier = Modifier.focusRequester(validateFocusRequester),
-                            shape = RoundedCornerShape(20.dp)
-                        ) { isFocused ->
-                            Box(
-                                modifier = Modifier
-                                    .height(40.dp)
-                                    .background(
-                                        if (isFocused) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                        RoundedCornerShape(20.dp)
-                                    )
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Google Authenticate (Option 1)",
-                                    color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
                             }
+                            showGoogleLoginDialogOption = 1
+                        },
+                        modifier = Modifier.focusRequester(validateFocusRequester),
+                        shape = RoundedCornerShape(20.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .height(40.dp)
+                                .fillMaxWidth()
+                                .background(
+                                    if (isFocused) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                    RoundedCornerShape(20.dp)
+                                )
+                                .padding(horizontal = 24.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Link Folder & Google Authenticate (Option 1)",
+                                color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
+                    }
 
-                        // Button Option 2
-                        val option2FocusRequester = remember { FocusRequester() }
-                        TVFocusableItem(
-                            onClick = {
-                                if (validationState == ValidationState.Validating) return@TVFocusableItem
-                                if (urlInput.isBlank()) {
-                                    validationState = ValidationState.Error("Please enter a link or folder ID.")
-                                    return@TVFocusableItem
-                                }
-                                showGoogleLoginDialogOption = 2
-                            },
-                            modifier = Modifier.focusRequester(option2FocusRequester),
-                            shape = RoundedCornerShape(20.dp)
-                        ) { isFocused ->
-                            Box(
-                                modifier = Modifier
-                                    .height(40.dp)
-                                    .background(
-                                        if (isFocused) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                        RoundedCornerShape(20.dp)
-                                    )
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Google Authenticate (Option 2)",
-                                    color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
+                    // Separator "— OR —"
+                    Text(
+                        text = "— OR —",
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+
+                    // Button Option 2
+                    val option2FocusRequester = remember { FocusRequester() }
+                    TVFocusableItem(
+                        onClick = {
+                            if (validationState == ValidationState.Validating) return@TVFocusableItem
+                            if (urlInput.isBlank()) {
+                                validationState = ValidationState.Error("Please enter a link or folder ID.")
+                                return@TVFocusableItem
                             }
+                            showGoogleLoginDialogOption = 2
+                        },
+                        modifier = Modifier.focusRequester(option2FocusRequester),
+                        shape = RoundedCornerShape(20.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .height(40.dp)
+                                .fillMaxWidth()
+                                .background(
+                                    if (isFocused) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                    RoundedCornerShape(20.dp)
+                                )
+                                .padding(horizontal = 24.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Link Folder & Google Authenticate (Option 2)",
+                                color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
