@@ -286,6 +286,10 @@ object GoogleDriveClient {
             if (!response.isSuccessful) {
                 throw IOException("Google Drive scraping failed: ${response.code}")
             }
+            val finalUrl = response.request.url.toString()
+            if (finalUrl.contains("/file/d/") || finalUrl.contains("/file/u/") || finalUrl.contains("/view")) {
+                throw IOException("Resolved URL is a file, not a folder.")
+            }
             val html = response.body?.string() ?: throw IOException("Empty body")
 
             // Parse initial data JSON structure from Google Drive HTML source.
@@ -429,11 +433,22 @@ object GoogleDriveClient {
             lower.endsWith(".avi") -> "video/x-msvideo"
             lower.endsWith(".mov") -> "video/quicktime"
             lower.endsWith(".wmv") -> "video/x-ms-wmv"
+            lower.endsWith(".3gp") || lower.endsWith(".3gpp") -> "video/3gpp"
+            lower.endsWith(".ts") || lower.endsWith(".m2ts") -> "video/mp2t"
+            lower.endsWith(".asf") -> "video/x-ms-asf"
+            lower.endsWith(".flv") -> "video/x-flv"
+            lower.endsWith(".ogv") -> "video/ogg"
+            lower.endsWith(".vob") -> "video/dvd"
             lower.endsWith(".jpg") || lower.endsWith(".jpeg") -> "image/jpeg"
             lower.endsWith(".png") -> "image/png"
             lower.endsWith(".webp") -> "image/webp"
             lower.endsWith(".gif") -> "image/gif"
             lower.endsWith(".bmp") -> "image/x-ms-bmp"
+            lower.endsWith(".heic") -> "image/heic"
+            lower.endsWith(".heif") -> "image/heif"
+            lower.endsWith(".tiff") || lower.endsWith(".tif") -> "image/tiff"
+            lower.endsWith(".svg") -> "image/svg+xml"
+            lower.endsWith(".ico") -> "image/x-icon"
             lower.endsWith(".mp3") -> "audio/mpeg"
             lower.endsWith(".wav") -> "audio/x-wav"
             lower.endsWith(".flac") -> "audio/flac"

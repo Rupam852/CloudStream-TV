@@ -130,7 +130,7 @@ fun TVFocusableItem(
     }
 
     Surface(
-        onClick = if (onLongClick != null) { {} } else onClick,
+        onClick = onClick,
         enabled = enabled,
         scale = ClickableSurfaceDefaults.scale(focusedScale = scaleOnFocus),
         shape = ClickableSurfaceDefaults.shape(shape = shape),
@@ -402,7 +402,7 @@ fun TVSidebarItem(
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = {}
+                onClick = onSelect
             )
     } else {
         modifier
