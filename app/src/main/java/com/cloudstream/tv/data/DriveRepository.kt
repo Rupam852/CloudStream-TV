@@ -4,10 +4,13 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class DriveRepository(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
+    private val tokenMutex = Mutex()
 
     companion object {
         private const val PREFS_NAME = "CloudStreamTVPrefs"
@@ -210,34 +213,46 @@ class DriveRepository(context: Context) {
         
         if (accessToken == null) return null
         
-        // Refresh token if it will expire within 5 minutes (300,000 ms)
+        // Quick check without lock
         val isExpired = System.currentTimeMillis() + 300000 > expiry
+        if (!isExpired) return accessToken
         
-        if (isExpired && refreshToken != null) {
-            val clientId = getOAuthClientId()
-            val clientSecret = getOAuthClientSecret()
-            when (val result = com.cloudstream.tv.network.GoogleDriveClient.refreshAccessToken(clientId, clientSecret, refreshToken)) {
-                is com.cloudstream.tv.network.TokenResult.Success -> {
-                    val tokenResponse = result.response
-                    if (tokenResponse.access_token != null) {
-                        val newAccessToken = tokenResponse.access_token
-                        val newExpiry = System.currentTimeMillis() + (tokenResponse.expires_in ?: 3600) * 1000
-                        saveOAuthTokens(newAccessToken, refreshToken, newExpiry, getOAuthEmail())
-                        return newAccessToken
+        // Synchronize token refresh using Mutex
+        return tokenMutex.withLock {
+            val currentAccessToken = prefs.getString(KEY_OAUTH_ACCESS_TOKEN, null)
+            val currentExpiry = prefs.getLong(KEY_OAUTH_EXPIRY, 0L)
+            
+            if (currentAccessToken != null && System.currentTimeMillis() + 300000 <= currentExpiry) {
+                return@withLock currentAccessToken
+            }
+            
+            if (refreshToken != null) {
+                val clientId = getOAuthClientId()
+                val clientSecret = getOAuthClientSecret()
+                when (val result = com.cloudstream.tv.network.GoogleDriveClient.refreshAccessToken(clientId, clientSecret, refreshToken)) {
+                    is com.cloudstream.tv.network.TokenResult.Success -> {
+                        val tokenResponse = result.response
+                        if (tokenResponse.access_token != null) {
+                            val newAccessToken = tokenResponse.access_token
+                            val newExpiry = System.currentTimeMillis() + (tokenResponse.expires_in ?: 3600) * 1000
+                            saveOAuthTokens(newAccessToken, refreshToken, newExpiry, getOAuthEmail())
+                            newAccessToken
+                        } else {
+                            currentAccessToken
+                        }
+                    }
+                    is com.cloudstream.tv.network.TokenResult.InvalidCredentials -> {
+                        clearOAuthTokens()
+                        null
+                    }
+                    else -> {
+                        currentAccessToken
                     }
                 }
-                is com.cloudstream.tv.network.TokenResult.InvalidCredentials -> {
-                    clearOAuthTokens()
-                    return null
-                }
-                else -> {
-                    // Keep tokens on network/temporary errors and return the expired access token as fallback
-                    return accessToken
-                }
+            } else {
+                currentAccessToken
             }
         }
-        
-        return accessToken
     }
 
     fun saveOAuthTokens(
