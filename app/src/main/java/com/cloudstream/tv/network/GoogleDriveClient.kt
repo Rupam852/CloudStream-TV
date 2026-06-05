@@ -110,19 +110,19 @@ object GoogleDriveClient {
     }
 
     fun fetchFolderContents(folderId: String, apiKey: String?, oauthToken: String?): List<DriveFile> {
-        if (folderId == "demo-videos") {
-            return getDemoVideos()
+        val rawList = when {
+            folderId == "demo-videos" -> getDemoVideos()
+            folderId == "demo-photos" -> getDemoPhotos()
+            !oauthToken.isNullOrBlank() -> fetchFolderContentsViaOAuth(folderId, oauthToken)
+            !apiKey.isNullOrBlank() -> fetchFolderContentsViaApi(folderId, apiKey)
+            else -> fetchFolderContentsViaScraper(folderId)
         }
-        if (folderId == "demo-photos") {
-            return getDemoPhotos()
-        }
-        if (!oauthToken.isNullOrBlank()) {
-            return fetchFolderContentsViaOAuth(folderId, oauthToken)
-        }
-        if (!apiKey.isNullOrBlank()) {
-            return fetchFolderContentsViaApi(folderId, apiKey)
-        }
-        return fetchFolderContentsViaScraper(folderId)
+
+        // Sort folders first, then files. Within each group, sort alphabetically by name case-insensitively.
+        return rawList.sortedWith(
+            compareByDescending<DriveFile> { it.isFolder }
+                .thenBy { it.name.lowercase() }
+        )
     }
 
     private fun getDemoVideos(): List<DriveFile> {
