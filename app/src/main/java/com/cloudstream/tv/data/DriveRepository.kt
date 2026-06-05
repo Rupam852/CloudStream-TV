@@ -23,6 +23,7 @@ class DriveRepository(context: Context) {
         private const val KEY_OAUTH_EMAIL = "oauth_email"
         private const val KEY_OAUTH_CLIENT_ID = "oauth_client_id"
         private const val KEY_OAUTH_CLIENT_SECRET = "oauth_client_secret"
+        private const val KEY_WARNING_DISMISSED = "warning_notice_dismissed"
     }
 
     // --- Saved Folder Links ---
@@ -138,6 +139,14 @@ class DriveRepository(context: Context) {
         } else {
             prefs.edit().putString(KEY_API_KEY, key.trim()).apply()
         }
+    }
+
+    fun isWarningDismissed(): Boolean {
+        return prefs.getBoolean(KEY_WARNING_DISMISSED, false)
+    }
+
+    fun setWarningDismissed(dismissed: Boolean) {
+        prefs.edit().putBoolean(KEY_WARNING_DISMISSED, dismissed).apply()
     }
 
     fun getLastSelectedFolderId(): String? {

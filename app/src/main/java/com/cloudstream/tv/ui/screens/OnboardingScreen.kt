@@ -67,7 +67,7 @@ fun OnboardingScreen(
     var validationState by remember { mutableStateOf<ValidationState>(ValidationState.Idle) }
     var showGoogleLoginDialog by remember { mutableStateOf(false) }
     var showApiKeyLoginDialog by remember { mutableStateOf(false) }
-    var showInitialWarningDialog by remember { mutableStateOf(true) }
+    var showInitialWarningDialog by remember { mutableStateOf(!repository.isWarningDismissed()) }
     
     val coroutineScope = rememberCoroutineScope()
     
@@ -396,7 +396,10 @@ fun OnboardingScreen(
 
     if (showInitialWarningDialog) {
         InitialWarningOverlay(
-            onDismiss = { showInitialWarningDialog = false }
+            onDismiss = {
+                showInitialWarningDialog = false
+                repository.setWarningDismissed(true)
+            }
         )
     }
 }
