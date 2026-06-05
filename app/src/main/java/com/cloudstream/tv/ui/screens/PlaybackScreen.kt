@@ -2,6 +2,7 @@ package com.cloudstream.tv.ui.screens
 
 import android.annotation.SuppressLint
 import android.view.KeyEvent
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -116,21 +117,41 @@ fun PlaybackScreen(
     var loudnessEnhancer by remember { mutableStateOf<LoudnessEnhancer?>(null) }
     var audioSessionIdState by remember { mutableStateOf(0) }
 
+    var toastMessage by remember { mutableStateOf<String?>(null) }
+    var toastIcon by remember { mutableStateOf<androidx.compose.ui.graphics.vector.ImageVector?>(null) }
+    var toastTrigger by remember { mutableStateOf(0L) }
+
+    fun showToast(message: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+        toastMessage = message
+        toastIcon = icon
+        toastTrigger = System.currentTimeMillis()
+    }
+
+    LaunchedEffect(toastTrigger) {
+        if (toastMessage != null) {
+            delay(1500)
+            toastMessage = null
+            toastIcon = null
+        }
+    }
+
     fun applyAudioBoost(enhancer: LoudnessEnhancer?, level: Int) {
         try {
             if (enhancer != null) {
                 val gainMillibels = when (level) {
-                    0 -> 0      // 100%
-                    1 -> 600    // 120% (+6dB)
-                    2 -> 1200   // 150% (+12dB)
-                    3 -> 1800   // 200% (+18dB)
+                    0 -> 0      // 100% (Normal)
+                    1 -> 1000   // 120% (+10dB boost)
+                    2 -> 1800   // 150% (+18dB boost)
+                    3 -> 2600   // 200% (+26dB boost)
                     else -> 0
                 }
+                Log.d("PlaybackScreen", "Applying target gain: $gainMillibels mB to enhancer")
                 enhancer.setTargetGain(gainMillibels)
                 enhancer.enabled = (gainMillibels > 0)
+                Log.d("PlaybackScreen", "Enhancer enabled state: ${enhancer.enabled}, actual target gain: ${enhancer.targetGain} mB")
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("PlaybackScreen", "Failed to apply audio boost", e)
         }
     }
 
@@ -214,15 +235,17 @@ fun PlaybackScreen(
 
             override fun onAudioSessionIdChanged(audioSessionId: Int) {
                 audioSessionIdState = audioSessionId
+                Log.d("PlaybackScreen", "onAudioSessionIdChanged: $audioSessionId")
                 try {
                     loudnessEnhancer?.release()
                     if (audioSessionId != 0) {
                         val enhancer = LoudnessEnhancer(audioSessionId)
                         loudnessEnhancer = enhancer
                         applyAudioBoost(enhancer, audioBoostLevel)
+                        Log.d("PlaybackScreen", "LoudnessEnhancer attached to session $audioSessionId successfully")
                     }
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    Log.e("PlaybackScreen", "Error attaching LoudnessEnhancer to session $audioSessionId", e)
                 }
             }
 
@@ -285,8 +308,10 @@ fun PlaybackScreen(
         showControls()
         if (exoPlayer.playWhenReady) {
             exoPlayer.pause()
+            showToast("Pause", Icons.Default.Pause)
         } else {
             exoPlayer.play()
+            showToast("Play", Icons.Default.PlayArrow)
         }
     }
 
@@ -294,18 +319,21 @@ fun PlaybackScreen(
         showControls()
         exoPlayer.seekTo((exoPlayer.currentPosition + 10000).coerceAtMost(duration))
         currentPosition = exoPlayer.currentPosition
+        showToast("Forward +10s", Icons.Default.FastForward)
     }
 
     fun seekRewind() {
         showControls()
         exoPlayer.seekTo((exoPlayer.currentPosition - 10000).coerceAtLeast(0))
         currentPosition = exoPlayer.currentPosition
+        showToast("Rewind -10s", Icons.Default.FastRewind)
     }
 
     fun skipNext() {
         if (activeIndex < playlist.size - 1) {
             showControls()
             activeIndex++
+            showToast("Next Video", Icons.Default.SkipNext)
         }
     }
 
@@ -313,6 +341,7 @@ fun PlaybackScreen(
         if (activeIndex > 0) {
             showControls()
             activeIndex--
+            showToast("Previous Video", Icons.Default.SkipPrevious)
         }
     }
 
@@ -323,6 +352,13 @@ fun PlaybackScreen(
             AspectRatioFrameLayout.RESIZE_MODE_FILL -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
             else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
         }
+        val modeText = when (resizeMode) {
+            AspectRatioFrameLayout.RESIZE_MODE_FIT -> "Fit to Screen"
+            AspectRatioFrameLayout.RESIZE_MODE_FILL -> "Stretch / Fill"
+            AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "Zoom"
+            else -> "Fit to Screen"
+        }
+        showToast("Aspect Ratio: $modeText", Icons.Default.AspectRatio)
     }
 
     fun toggleSpeed() {
@@ -335,6 +371,7 @@ fun PlaybackScreen(
             else -> 1.0f
         }
         exoPlayer.setPlaybackSpeed(playbackSpeed)
+        showToast("Speed: ${playbackSpeed}x", Icons.Default.Speed)
     }
 
     // Root container to capture TV Remote D-Pad keys
@@ -590,6 +627,14 @@ fun PlaybackScreen(
                             onClick = {
                                 showControls()
                                 audioBoostLevel = (audioBoostLevel + 1) % 4
+                                val boostText = when (audioBoostLevel) {
+                                    0 -> "100% (Normal)"
+                                    1 -> "120% (Soft Boost)"
+                                    2 -> "150% (Medium Boost)"
+                                    3 -> "200% (High Boost)"
+                                    else -> "100%"
+                                }
+                                showToast("Audio Boost: $boostText", Icons.Default.VolumeUp)
                             },
                             shape = RoundedCornerShape(8.dp),
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
@@ -661,6 +706,43 @@ fun PlaybackScreen(
                                     )
                                 }
                             }
+                        }
+                    }
+                }
+            }
+            // 3. Playback Action Toast / Notification Overlay (Renders on top of everything)
+            AnimatedVisibility(
+                visible = !toastMessage.isNullOrBlank(),
+                enter = fadeIn(animationSpec = tween(200)),
+                exit = fadeOut(animationSpec = tween(200)),
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                toastMessage?.let { msg ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(Color.Black.copy(alpha = 0.8f))
+                            .padding(horizontal = 24.dp, vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            toastIcon?.let { icon ->
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Text(
+                                text = msg,
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
