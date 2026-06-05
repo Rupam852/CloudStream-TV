@@ -12,7 +12,8 @@ CloudStream TV is a premium, native Android TV application built using **Kotlin*
 - **ExoPlayer Video Streaming**: Premium media playback supporting Play/Pause, fast-forward/rewind, aspect ratio scaling (fit/fill/zoom), and playback speed controls.
 - **Photo Slideshows**: Beautiful, automated image slideshows with custom transition intervals (3s, 5s, 10s, 15s) and manual traversal.
 - **Google OAuth 2.0 (Device Flow)**: Secure sign-in designed for TV devices. Displays an activation link alongside a dynamic **QR Code** for quick scanning from a phone or computer.
-- **Lag-Free TV Performance**: Native D-pad focus animations, canvas-level visual styles, and background image debouncing for a smooth 60FPS TV experience.
+- **Lag-Free TV Performance**: Native D-pad focus animations, unique keys for scroll item caching in all lazy grids/lists, hardware-accelerated `.graphicsLayer` alpha rendering, and isolated playback seekbar recompositions to guarantee smooth 60FPS TV performance on budget TV processors.
+- **Mutex Token Sync & Secure Caching**: Parallel network requests are synchronized with a coroutine `Mutex` to prevent redundant server token refreshes. All credentials are encrypted and stored locally.
 - **Recents & History**: Seamless shelf showing recently streamed items, with one-press retry and clear history actions.
 - **Overlay Sidebar**: Expandable navigation menu for switching between folders, adding new drives, and toggling dark/light themes.
 
@@ -23,13 +24,13 @@ CloudStream TV is a premium, native Android TV application built using **Kotlin*
 CloudStream TV is strictly optimized for **Video** and **Photo** streaming. Other file formats are not supported.
 
 ### ✅ Supported Media Type Streams
-- **Videos**: `.mp4`, `.mkv`, `.webm`, `.m4v`, `.3gp`, etc.
-- **Photos**: `.jpg`, `.jpeg`, `.png`, `.webp`, `.bmp`, etc.
+- **Videos**: `.mp4`, `.mkv`, `.webm`, `.m4v`, `.avi`, `.mov`, `.wmv`, `.3gp`, `.ts`, `.m2ts`, `.flv`, `.asf`, `.vob`, `.ogv`
+- **Photos**: `.jpg`, `.jpeg`, `.png`, `.webp`, `.bmp`, `.gif`, `.heic`, `.heif`, `.tiff`, `.svg`, `.ico`
 
 ### ❌ Unsupported Formats (Displays Warning Toast)
 - Documents (`.pdf`, `.docx`, `.xlsx`, `.pptx`)
 - Raw text files (`.txt`, `.json`)
-- Audio-only files (`.mp3`, `.wav`)
+- Audio-only files (`.mp3`, `.wav`, `.flac`, `.m4a`)
 - Unsupported formats will trigger a `"File streaming not supported"` message.
 
 ---
