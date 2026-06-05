@@ -113,14 +113,16 @@ app.get('/', (req, res) => {
 
 // Endpoint 1: TV requests a new Session ID
 app.get('/api/session', (req, res) => {
+    const opt = req.query.opt || '1';
     // Generate a clean 6-character unique session code (e.g. 'A2F89B')
     const sessionId = crypto.randomBytes(3).toString('hex').toUpperCase();
     sessions.set(sessionId, {
         status: 'pending',
         tokens: null,
+        opt: opt,
         createdAt: Date.now()
     });
-    console.log(`[Session Created] ID: ${sessionId}`);
+    console.log(`[Session Created] ID: ${sessionId} (Option: ${opt})`);
     res.json({ session_id: sessionId });
 });
 
@@ -134,11 +136,14 @@ app.get('/api/login', (req, res) => {
         return res.status(400).send('Invalid or expired login session. Please close the login screen on your TV and open it again.');
     }
 
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+    const session = sessions.get(sessionId);
+    const useOpt2 = session.opt === '2';
+
+    const clientId = useOpt2 ? process.env.GOOGLE_CLIENT_ID_2 : process.env.GOOGLE_CLIENT_ID;
+    const redirectUri = useOpt2 ? process.env.GOOGLE_REDIRECT_URI_2 : process.env.GOOGLE_REDIRECT_URI;
 
     if (!clientId || !redirectUri) {
-        return res.status(500).send('Server configuration error: GOOGLE_CLIENT_ID or GOOGLE_REDIRECT_URI env variables are missing.');
+        return res.status(500).send(`Server configuration error: GOOGLE_CLIENT_ID${useOpt2 ? '_2' : ''} or GOOGLE_REDIRECT_URI${useOpt2 ? '_2' : ''} env variables are missing.`);
     }
 
     // Direct user to Google's standard OAuth2 Login Web page
@@ -166,9 +171,12 @@ app.get('/api/callback', async (req, res) => {
         return res.status(400).send('Authentication expired or invalid request parameters.');
     }
 
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+    const session = sessions.get(sessionId);
+    const useOpt2 = session.opt === '2';
+
+    const clientId = useOpt2 ? process.env.GOOGLE_CLIENT_ID_2 : process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = useOpt2 ? process.env.GOOGLE_CLIENT_SECRET_2 : process.env.GOOGLE_CLIENT_SECRET;
+    const redirectUri = useOpt2 ? process.env.GOOGLE_REDIRECT_URI_2 : process.env.GOOGLE_REDIRECT_URI;
 
     try {
         // Exchange authorization code for OAuth tokens
@@ -194,7 +202,6 @@ app.get('/api/callback', async (req, res) => {
         }
 
         // Save credentials to session
-        const session = sessions.get(sessionId);
         session.status = 'authorized';
         session.tokens = {
             access_token: tokens.access_token,

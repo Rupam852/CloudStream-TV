@@ -240,10 +240,19 @@ class DriveRepository(context: Context) {
         return accessToken
     }
 
-    fun saveOAuthTokens(accessToken: String, refreshToken: String?, expiry: Long, email: String?) {
+    fun saveOAuthTokens(
+        accessToken: String,
+        refreshToken: String?,
+        expiry: Long,
+        email: String?,
+        clientId: String = getOAuthClientId(),
+        clientSecret: String = getOAuthClientSecret()
+    ) {
         val editor = prefs.edit()
             .putString(KEY_OAUTH_ACCESS_TOKEN, accessToken)
             .putLong(KEY_OAUTH_EXPIRY, expiry)
+            .putString(KEY_OAUTH_CLIENT_ID, clientId)
+            .putString(KEY_OAUTH_CLIENT_SECRET, clientSecret)
         if (refreshToken != null) {
             editor.putString(KEY_OAUTH_REFRESH_TOKEN, refreshToken)
         }
@@ -259,6 +268,8 @@ class DriveRepository(context: Context) {
             .remove(KEY_OAUTH_REFRESH_TOKEN)
             .remove(KEY_OAUTH_EXPIRY)
             .remove(KEY_OAUTH_EMAIL)
+            .remove(KEY_OAUTH_CLIENT_ID)
+            .remove(KEY_OAUTH_CLIENT_SECRET)
             .apply()
     }
 
@@ -271,18 +282,28 @@ class DriveRepository(context: Context) {
     }
 
     fun getOAuthClientId(): String {
-        return com.cloudstream.tv.network.GoogleDriveClient.DEFAULT_CLIENT_ID
+        return prefs.getString(KEY_OAUTH_CLIENT_ID, com.cloudstream.tv.network.GoogleDriveClient.DEFAULT_CLIENT_ID)
+            ?: com.cloudstream.tv.network.GoogleDriveClient.DEFAULT_CLIENT_ID
     }
 
     fun setOAuthClientId(clientId: String?) {
-        // No-op: Custom credential configuration is disabled.
+        if (clientId == null) {
+            prefs.edit().remove(KEY_OAUTH_CLIENT_ID).apply()
+        } else {
+            prefs.edit().putString(KEY_OAUTH_CLIENT_ID, clientId).apply()
+        }
     }
 
     fun getOAuthClientSecret(): String {
-        return com.cloudstream.tv.network.GoogleDriveClient.DEFAULT_CLIENT_SECRET
+        return prefs.getString(KEY_OAUTH_CLIENT_SECRET, com.cloudstream.tv.network.GoogleDriveClient.DEFAULT_CLIENT_SECRET)
+            ?: com.cloudstream.tv.network.GoogleDriveClient.DEFAULT_CLIENT_SECRET
     }
 
     fun setOAuthClientSecret(secret: String?) {
-        // No-op: Custom credential configuration is disabled.
+        if (secret == null) {
+            prefs.edit().remove(KEY_OAUTH_CLIENT_SECRET).apply()
+        } else {
+            prefs.edit().putString(KEY_OAUTH_CLIENT_SECRET, secret).apply()
+        }
     }
 }

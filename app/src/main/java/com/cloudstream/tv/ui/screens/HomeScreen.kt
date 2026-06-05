@@ -965,6 +965,7 @@ fun AddFolderOverlay(
 @Composable
 fun GoogleLoginOverlay(
     repository: DriveRepository,
+    loginOption: Int,
     onDismiss: () -> Unit,
     onLoginSuccess: () -> Unit
 ) {
@@ -982,24 +983,32 @@ fun GoogleLoginOverlay(
         var timeRemainingState by remember { mutableStateOf(300) }
         
         var retryKey by remember { mutableStateOf(0) }
-
+ 
         val context = LocalContext.current
         val cancelFocusRequester = remember { FocusRequester() }
-
+ 
         LaunchedEffect(retryKey) {
             isPolling = true
             errorMsg = null
             userCode = ""
             verificationUrl = ""
-            val clientId = repository.getOAuthClientId()
+            val clientId = if (loginOption == 2) {
+                com.cloudstream.tv.network.GoogleDriveClient.DEFAULT_CLIENT_ID_2
+            } else {
+                com.cloudstream.tv.network.GoogleDriveClient.DEFAULT_CLIENT_ID
+            }
+            val clientSecret = if (loginOption == 2) {
+                com.cloudstream.tv.network.GoogleDriveClient.DEFAULT_CLIENT_SECRET_2
+            } else {
+                com.cloudstream.tv.network.GoogleDriveClient.DEFAULT_CLIENT_SECRET
+            }
             try {
-                val response = com.cloudstream.tv.network.GoogleDriveClient.requestDeviceCode(clientId)
+                val response = com.cloudstream.tv.network.GoogleDriveClient.requestDeviceCode(clientId, loginOption)
                 userCode = response.user_code
                 verificationUrl = response.verification_url
                 
                 timeRemainingState = response.expires_in
                 val interval = response.interval.toLong()
-                val clientSecret = repository.getOAuthClientSecret()
                 
                 while (isPolling && timeRemainingState > 0) {
                     kotlinx.coroutines.delay(interval * 1000)
@@ -1013,7 +1022,9 @@ fun GoogleLoginOverlay(
                                 tokenResponse.access_token,
                                 tokenResponse.refresh_token,
                                 expiry,
-                                email
+                                email,
+                                clientId,
+                                clientSecret
                             )
                             isPolling = false
                             Toast.makeText(context, "Logged in successfully!", Toast.LENGTH_SHORT).show()
