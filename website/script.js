@@ -96,6 +96,66 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // 1b. Google Drive Folder Linking Guide Steps Data
+    const linkingStepsData = {
+        1: {
+            icon: '📁',
+            title: 'Step 1: Organize Videos & Photos',
+            description: 'Create a folder in your Google Drive and upload only the videos (MP4, MKV, WebM, AVI, MOV) and photos (JPG, JPEG, PNG, WebP) you want to view. Note: Other formats (like PDFs, Word docs, zip archives, or audio files) are ignored to maintain a clean TV interface.'
+        },
+        2: {
+            icon: '🔗',
+            title: 'Step 2: Enter URL or ID in TV App',
+            description: 'Launch CloudStream TV on your Android TV or Google TV. On the welcome onboarding screen, enter either the full Google Drive folder sharing link or just the folder ID directly into the URL input field. You can optionally give this folder a custom nickname.'
+        },
+        3: {
+            icon: '🔐',
+            title: 'Step 3: Google Authenticate (Option 1 or Option 2)',
+            description: 'If Option 1 reaches Google\'s concurrent user limit, choose Option 2 to authenticate securely. Scan the QR code with your phone/PC to go to our Render authentication website, enter the 6-character code shown on your TV, and sign in to connect your Google Account.'
+        },
+        4: {
+            icon: '➕',
+            title: 'Step 4: Add More Folders via Sidebar',
+            description: 'Once you are logged in, your home grid will render. To add another folder, expand the TV sidebar using your remote, select "Add Link", paste the new folder URL or ID, and verify. You can link as many video and photo folders as you like!'
+        }
+    };
+
+    const linkingStepButtons = document.querySelectorAll('.linking-step-btn');
+    const linkingVisualIcon = document.getElementById('linking-visual-icon');
+    const linkingVisualTitle = document.getElementById('linking-visual-title');
+    const linkingVisualDescription = document.getElementById('linking-visual-description');
+
+    // Handle interactive linking step switching
+    linkingStepButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            // Remove active class from all linking buttons
+            linkingStepButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // Add active class to clicked button
+            button.classList.add('active');
+
+            // Retrieve step ID
+            const stepId = button.getAttribute('data-step');
+            const data = linkingStepsData[stepId];
+
+            if (data) {
+                // Apply a quick transition animation to the visual container
+                const container = document.querySelector('.linking-visual-container');
+                container.style.opacity = '0';
+                container.style.transform = 'scale(0.95)';
+                
+                setTimeout(() => {
+                    linkingVisualIcon.textContent = data.icon;
+                    linkingVisualTitle.textContent = data.title;
+                    linkingVisualDescription.textContent = data.description;
+                    
+                    container.style.opacity = '1';
+                    container.style.transform = 'scale(1)';
+                }, 150);
+            }
+        });
+    });
+
     // 2. Active Navigation link highlighted on Scroll
     const sections = document.querySelectorAll('section, header');
     const navLinks = document.querySelectorAll('nav a');

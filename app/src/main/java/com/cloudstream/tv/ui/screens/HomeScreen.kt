@@ -130,15 +130,6 @@ fun HomeScreen(
     // Active folder for Rename/Remove options dialog
     var folderOptionsActiveFolder by remember { mutableStateOf<DriveLink?>(null) }
 
-    var oauthToken by remember { mutableStateOf<String?>(null) }
-    var apiKey by remember { mutableStateOf<String?>(null) }
-
-    // Resolve tokens
-    LaunchedEffect(currentFolderId) {
-        oauthToken = if (repository.isLoggedIn()) repository.getAccessToken() else null
-        apiKey = repository.getApiKey()
-    }
-
     val foldersListTriggerFocusRequester = remember { FocusRequester() }
     val lastFolderFocusRequester = remember { FocusRequester() }
     val addLinkFocusRequester = remember { FocusRequester() }
@@ -156,7 +147,7 @@ fun HomeScreen(
     var showAddFolderDialog by remember { mutableStateOf(false) }
 
     // Load folder contents
-    fun loadFolder(folderId: String?) {
+    suspend fun loadFolder(folderId: String?) {
         if (folderId == null) {
             filesList = emptyList()
             return
@@ -164,19 +155,20 @@ fun HomeScreen(
         
         isLoadingFiles = true
         loadingError = null
-        coroutineScope.launch {
-            try {
-                val results = withContext(Dispatchers.IO) {
-                    val token = repository.getAccessToken()
-                    GoogleDriveClient.fetchFolderContents(folderId, repository.getApiKey(), token)
-                }
-                filesList = results
-            } catch (e: Exception) {
-                loadingError = "Failed to load files: ${e.localizedMessage}"
-                filesList = emptyList()
-            } finally {
-                isLoadingFiles = false
+        try {
+            val results = withContext(Dispatchers.IO) {
+                val token = repository.getAccessToken()
+                GoogleDriveClient.fetchFolderContents(folderId, repository.getApiKey(), token)
             }
+            filesList = results
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) {
+                throw e
+            }
+            loadingError = "Failed to load files: ${e.localizedMessage}"
+            filesList = emptyList()
+        } finally {
+            isLoadingFiles = false
         }
     }
 
@@ -196,7 +188,9 @@ fun HomeScreen(
 
     // Handle physical TV Back Button
     BackHandler(enabled = !isOverlayActive) {
-        if (folderNavigationStack.isNotEmpty()) {
+        if (searchQuery.isNotBlank()) {
+            searchQuery = ""
+        } else if (folderNavigationStack.isNotEmpty()) {
             val previousFolder = folderNavigationStack.removeAt(folderNavigationStack.lastIndex)
             currentFolderId = previousFolder
         } else {
@@ -225,8 +219,7 @@ fun HomeScreen(
             // 1. Dynamic Backdrop Blur of Selected Card (using provider to isolate recomposition)
             HomeScreenBackdrop(
                 backdropUrlProvider = { backdropUrl },
-                oauthToken = oauthToken,
-                apiKey = apiKey
+                repository = repository
             )
 
             // 2. Main Row Layout: Sidebar + Content
@@ -375,7 +368,11 @@ fun HomeScreen(
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 TVFocusableItem(
-                                    onClick = { loadFolder(currentFolderId) },
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            loadFolder(currentFolderId)
+                                        }
+                                    },
                                     shape = RoundedCornerShape(20.dp)
                                 ) { isFocused ->
                                     Box(
@@ -683,7 +680,6 @@ fun HomeScreen(
                                     selectedFolderId = folder.id
                                     currentFolderId = folder.id
                                     repository.setLastSelectedFolderId(folder.id)
-                                    loadFolder(folder.id)
                                     Toast.makeText(context, "Switched to: ${folder.name}", Toast.LENGTH_SHORT).show()
                                 },
                                 isExpanded = isSidebarExpanded,
@@ -1291,36 +1287,44 @@ fun GoogleLoginOverlay(
 @Composable
 fun HomeScreenBackdrop(
     backdropUrlProvider: () -> String?,
-    oauthToken: String?,
-    apiKey: String?,
+    repository: DriveRepository,
     modifier: Modifier = Modifier
 ) {
     val backdropUrl = backdropUrlProvider()
     val context = LocalContext.current
-    val imageModel = remember(backdropUrl, oauthToken, apiKey) {
+    var imageModel by remember { mutableStateOf<Any?>(null) }
+
+    LaunchedEffect(backdropUrl) {
         val url = backdropUrl
         if (url == null) {
-            null
-        } else if (url.startsWith("http") && !url.contains("googleapis.com")) {
-            url
-        } else {
-            val builder = coil.request.ImageRequest.Builder(context)
-                .data(url)
-                .crossfade(true)
-                .crossfade(300)
-            
-            if (oauthToken != null) {
-                builder.setHeader("Authorization", "Bearer $oauthToken")
-            } else if (!apiKey.isNullOrBlank()) {
-                val finalUrl = if (url.contains("googleapis.com") && !url.contains("key=")) {
-                    if (url.contains("?")) "$url&key=$apiKey" else "$url?key=$apiKey"
-                } else {
-                    url
-                }
-                builder.data(finalUrl)
-            }
-            builder.build()
+            imageModel = null
+            return@LaunchedEffect
         }
+
+        if (url.startsWith("http") && !url.contains("googleapis.com")) {
+            imageModel = url
+            return@LaunchedEffect
+        }
+
+        val oauthToken = if (repository.isLoggedIn()) repository.getAccessToken() else null
+        val apiKey = repository.getApiKey()
+
+        val builder = coil.request.ImageRequest.Builder(context)
+            .data(url)
+            .crossfade(true)
+            .crossfade(300)
+        
+        if (oauthToken != null) {
+            builder.setHeader("Authorization", "Bearer $oauthToken")
+        } else if (!apiKey.isNullOrBlank()) {
+            val finalUrl = if (url.contains("googleapis.com") && !url.contains("key=")) {
+                if (url.contains("?")) "$url&key=$apiKey" else "$url?key=$apiKey"
+            } else {
+                url
+            }
+            builder.data(finalUrl)
+        }
+        imageModel = builder.build()
     }
 
     Box(

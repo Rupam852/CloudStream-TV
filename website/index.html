@@ -45,6 +45,7 @@
         <nav class="nav-menu">
             <a href="#home" class="nav-link active">Home</a>
             <a href="#features" class="nav-link">Features</a>
+            <a href="#how-to-link" class="nav-link">How to Link</a>
             <a href="#guide" class="nav-link">How to Install</a>
             <a href="#download" class="btn btn-secondary btn-shine download-nav-btn" style="padding: 8px 16px; border-radius: 8px; font-size: 0.9rem;">Download APK</a>
         </nav>
@@ -198,6 +199,62 @@
                     </div>
                     <h3>Lag-Free Navigation</h3>
                     <p>Specifically engineered to avoid rendering lags. Sidebar menus draw layout elements directly on GPU layers, completely avoiding D-pad UI frame stuttering.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Google Drive Linking & Authentication Guide -->
+        <section class="linking-guide-section" id="how-to-link" style="border-bottom: 1px solid var(--border-card);">
+            <div class="section-header">
+                <h2>How to Link Folders & Google Account</h2>
+                <p>Follow our interactive guide to learn how to connect your public or private Google Drive folders and sign in securely to stream your personal videos and photos.</p>
+            </div>
+
+            <div class="interactive-guide">
+                <!-- Left navigation buttons -->
+                <div class="guide-navigation">
+                    <button class="linking-step-btn active" data-step="1" id="link-step1-btn">
+                        <div class="step-number">1</div>
+                        <div class="step-details">
+                            <h4>Organize Videos & Photos</h4>
+                            <p>Upload only video and image files to Google Drive</p>
+                        </div>
+                    </button>
+                    
+                    <button class="linking-step-btn" data-step="2" id="link-step2-btn">
+                        <div class="step-number">2</div>
+                        <div class="step-details">
+                            <h4>Enter Folder Link in App</h4>
+                            <p>Provide the sharing link or folder ID on TV welcome screen</p>
+                        </div>
+                    </button>
+                    
+                    <button class="linking-step-btn" data-step="3" id="link-step3-btn">
+                        <div class="step-number">3</div>
+                        <div class="step-details">
+                            <h4>Google Authenticate</h4>
+                            <p>Verify your account securely with Option 1 or Option 2</p>
+                        </div>
+                    </button>
+                    
+                    <button class="linking-step-btn" data-step="4" id="link-step4-btn">
+                        <div class="step-number">4</div>
+                        <div class="step-details">
+                            <h4>Add Multiple Folders</h4>
+                            <p>Link new video and photo libraries from TV sidebar</p>
+                        </div>
+                    </button>
+                </div>
+
+                <!-- Right visual preview card -->
+                <div class="guide-visuals">
+                    <div class="visual-container linking-visual-container">
+                        <div class="visual-icon" id="linking-visual-icon">📁</div>
+                        <div class="visual-title" id="linking-visual-title">Step 1: Organize Videos & Photos</div>
+                        <div class="visual-description" id="linking-visual-description">
+                            Create a folder in your Google Drive and upload only the videos (MP4, MKV, WebM, AVI, MOV) and photos (JPG, JPEG, PNG, WebP) you want to view. Note: Other formats (like PDFs, Word docs, or zip files) are ignored to maintain a clean layout.
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>

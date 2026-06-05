@@ -88,23 +88,6 @@ fun PlaybackScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    
-    // Keep TV screen awake ONLY during active video playback to prevent OLED/QLED screen burn-in when idle
-    DisposableEffect(context) {
-        var hostActivity: android.app.Activity? = null
-        var ctx = context
-        while (ctx is android.content.ContextWrapper) {
-            if (ctx is android.app.Activity) {
-                hostActivity = ctx
-                break
-            }
-            ctx = ctx.baseContext
-        }
-        hostActivity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        onDispose {
-            hostActivity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
-    }
 
     // Intercept back gesture/button to go back to Home screen instead of exiting the activity
     BackHandler {
@@ -195,6 +178,40 @@ fun PlaybackScreen(
 
     // Playback and UI States
     var isPlaying by remember { mutableStateOf(exoPlayer.playWhenReady) }
+
+    val hostActivity = remember(context) {
+        var activity: android.app.Activity? = null
+        var ctx = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is android.app.Activity) {
+                activity = ctx
+                break
+            }
+            ctx = ctx.baseContext
+        }
+        activity
+    }
+
+    // Keep TV screen awake ONLY during active video playback to prevent OLED/QLED screen burn-in when idle
+    LaunchedEffect(isPlaying, hostActivity) {
+        if (hostActivity != null) {
+            if (isPlaying) {
+                hostActivity.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                Log.d("PlaybackScreen", "Keep screen on: ADDED")
+            } else {
+                hostActivity.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                Log.d("PlaybackScreen", "Keep screen on: CLEARED")
+            }
+        }
+    }
+
+    // Ensure it's cleared when screen is disposed
+    DisposableEffect(hostActivity) {
+        onDispose {
+            hostActivity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
     var currentPosition by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var bufferPosition by remember { mutableLongStateOf(0L) }

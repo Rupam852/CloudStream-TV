@@ -74,23 +74,6 @@ fun SlideshowScreen(
 ) {
     val context = LocalContext.current
 
-    // Keep TV screen awake ONLY during active slideshow to prevent OLED/QLED screen burn-in when idle
-    DisposableEffect(context) {
-        var hostActivity: android.app.Activity? = null
-        var ctx = context
-        while (ctx is android.content.ContextWrapper) {
-            if (ctx is android.app.Activity) {
-                hostActivity = ctx
-                break
-            }
-            ctx = ctx.baseContext
-        }
-        hostActivity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        onDispose {
-            hostActivity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
-    }
-
     if (photos.isEmpty()) {
         LaunchedEffect(Unit) { onBack() }
         return
@@ -111,6 +94,38 @@ fun SlideshowScreen(
     }
 
     var isPlaying by remember { mutableStateOf(true) }
+
+    val hostActivity = remember(context) {
+        var activity: android.app.Activity? = null
+        var ctx = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is android.app.Activity) {
+                activity = ctx
+                break
+            }
+            ctx = ctx.baseContext
+        }
+        activity
+    }
+
+    // Keep TV screen awake ONLY during active slideshow to prevent OLED/QLED screen burn-in when idle
+    LaunchedEffect(isPlaying, hostActivity) {
+        if (hostActivity != null) {
+            if (isPlaying) {
+                hostActivity.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            } else {
+                hostActivity.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+    }
+
+    // Ensure it's cleared when screen is disposed
+    DisposableEffect(hostActivity) {
+        onDispose {
+            hostActivity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
     var intervalSeconds by remember { mutableIntStateOf(5) } // default 5 seconds
     
     var controlsVisible by remember { mutableStateOf(true) }

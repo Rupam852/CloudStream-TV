@@ -44,9 +44,53 @@ object GoogleDriveClient {
     }
 
     fun validateFolder(folderId: String, apiKey: String?, oauthToken: String?): Boolean {
+        if (folderId == "demo-videos" || folderId == "demo-photos") {
+            return true
+        }
         return try {
-            val files = fetchFolderContents(folderId, apiKey, oauthToken)
-            // If we successfully fetched the list, it's valid (even if empty)
+            // Check mimeType first if we are authenticated or have API key
+            if (!oauthToken.isNullOrBlank()) {
+                val url = "https://www.googleapis.com/drive/v3/files/$folderId?fields=mimeType"
+                val request = Request.Builder()
+                    .url(url)
+                    .header("Authorization", "Bearer $oauthToken")
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val body = response.body?.string() ?: ""
+                        val json = Gson().fromJson(body, JsonObject::class.java)
+                        val mimeType = json.get("mimeType")?.asString ?: ""
+                        if (mimeType != "application/vnd.google-apps.folder") {
+                            Log.w(TAG, "Resource is not a folder: $folderId, mimeType: $mimeType")
+                            return false
+                        }
+                    } else {
+                        Log.e(TAG, "Resource check failed with HTTP ${response.code}")
+                        return false
+                    }
+                }
+            } else if (!apiKey.isNullOrBlank()) {
+                val url = "https://www.googleapis.com/drive/v3/files/$folderId?fields=mimeType&key=$apiKey"
+                val request = Request.Builder()
+                    .url(url)
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val body = response.body?.string() ?: ""
+                        val json = Gson().fromJson(body, JsonObject::class.java)
+                        val mimeType = json.get("mimeType")?.asString ?: ""
+                        if (mimeType != "application/vnd.google-apps.folder") {
+                            Log.w(TAG, "Resource is not a folder: $folderId, mimeType: $mimeType")
+                            return false
+                        }
+                    } else {
+                        Log.e(TAG, "Resource check failed with HTTP ${response.code}")
+                        return false
+                    }
+                }
+            }
+
+            fetchFolderContents(folderId, apiKey, oauthToken)
             true
         } catch (e: Exception) {
             Log.e(TAG, "Validation failed for folder $folderId", e)
