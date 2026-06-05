@@ -66,8 +66,6 @@ fun OnboardingScreen(
     var folderNameInput by remember { mutableStateOf("") }
     var validationState by remember { mutableStateOf<ValidationState>(ValidationState.Idle) }
     var showGoogleLoginDialog by remember { mutableStateOf(false) }
-    var showApiKeyLoginDialog by remember { mutableStateOf(false) }
-    var showInitialWarningDialog by remember { mutableStateOf(!repository.isWarningDismissed()) }
     
     val coroutineScope = rememberCoroutineScope()
     
@@ -254,85 +252,39 @@ fun OnboardingScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Actions Column (Link Folder buttons stacked vertically to avoid screen clipping)
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                horizontalAlignment = Alignment.Start
-            ) {
-                TVFocusableItem(
-                    onClick = {
-                        if (validationState == ValidationState.Validating) return@TVFocusableItem
-                        if (urlInput.isBlank()) {
-                            validationState = ValidationState.Error("Please enter a link or folder ID.")
-                            return@TVFocusableItem
-                        }
-                        if (repository.isLoggedIn()) {
-                            startValidation(urlInput, folderNameInput)
-                        } else {
-                            showGoogleLoginDialog = true
-                        }
-                    },
-                    modifier = Modifier.focusRequester(validateFocusRequester),
-                    shape = RoundedCornerShape(20.dp)
-                ) { isFocused ->
-                    Box(
-                        modifier = Modifier
-                            .height(40.dp)
-                            .background(
-                                if (isFocused) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                RoundedCornerShape(20.dp)
-                            )
-                            .padding(horizontal = 24.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Link Folder & Google Authenticate",
-                            color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+            TVFocusableItem(
+                onClick = {
+                    if (validationState == ValidationState.Validating) return@TVFocusableItem
+                    if (urlInput.isBlank()) {
+                        validationState = ValidationState.Error("Please enter a link or folder ID.")
+                        return@TVFocusableItem
                     }
-                }
-
-                Text(
-                    text = "— OR —",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 16.dp)
-                )
-
-                TVFocusableItem(
-                    onClick = {
-                        if (validationState == ValidationState.Validating) return@TVFocusableItem
-                        if (urlInput.isBlank()) {
-                            validationState = ValidationState.Error("Please enter a link or folder ID.")
-                            return@TVFocusableItem
-                        }
-                        showApiKeyLoginDialog = true
-                    },
-                    shape = RoundedCornerShape(20.dp)
-                ) { isFocused ->
-                    Box(
-                        modifier = Modifier
-                            .height(40.dp)
-                            .background(
-                                if (isFocused) MaterialTheme.colorScheme.secondary
-                                else MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
-                                RoundedCornerShape(20.dp)
-                            )
-                            .padding(horizontal = 24.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Link Folder with Own Drive API Key",
-                            color = if (isFocused) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.secondary,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+                    if (repository.isLoggedIn()) {
+                        startValidation(urlInput, folderNameInput)
+                    } else {
+                        showGoogleLoginDialog = true
                     }
+                },
+                modifier = Modifier.focusRequester(validateFocusRequester),
+                shape = RoundedCornerShape(20.dp)
+            ) { isFocused ->
+                Box(
+                    modifier = Modifier
+                        .height(40.dp)
+                        .background(
+                            if (isFocused) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            RoundedCornerShape(20.dp)
+                        )
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Link Folder & Google Authenticate",
+                        color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
 
@@ -385,228 +337,9 @@ fun OnboardingScreen(
         )
     }
 
-    if (showApiKeyLoginDialog) {
-        ApiKeyLoginOverlay(
-            onDismiss = { showApiKeyLoginDialog = false },
-            onSubmit = { key ->
-                showApiKeyLoginDialog = false
-                repository.setApiKey(key)
-                startValidation(urlInput, folderNameInput)
-            }
-        )
-    }
-
-    if (showInitialWarningDialog) {
-        InitialWarningOverlay(
-            onDismiss = {
-                showInitialWarningDialog = false
-                repository.setWarningDismissed(true)
-            }
-        )
-    }
 }
 
-// Dialog-like overlay for API Key entry
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-fun ApiKeyLoginOverlay(
-    onDismiss: () -> Unit,
-    onSubmit: (String) -> Unit
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnClickOutside = false
-        )
-    ) {
-        var apiKeyInput by remember { mutableStateOf("") }
-        val focusRequester = remember { FocusRequester() }
-        val submitFocusRequester = remember { FocusRequester() }
 
-        LaunchedEffect(Unit) {
-            focusRequester.requestFocus()
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.75f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                modifier = Modifier
-                    .width(440.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(24.dp)
-            ) {
-                Text(
-                    text = "Enter Google Drive API Key",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "This allows bypassing Google Authentication limits by using your own Google Cloud Drive API key.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "API Key",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                TVSearchBar(
-                    value = apiKeyInput,
-                    onValueChange = { apiKeyInput = it },
-                    focusRequester = focusRequester,
-                    onSearchAction = { submitFocusRequester.requestFocus() }
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TVFocusableItem(
-                        onClick = onDismiss,
-                        shape = RoundedCornerShape(8.dp)
-                    ) { isFocused ->
-                        Text(
-                            text = "Cancel",
-                            modifier = Modifier
-                                .background(
-                                    if (isFocused) MaterialTheme.colorScheme.surfaceVariant
-                                    else Color.Transparent,
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    TVFocusableItem(
-                        onClick = {
-                            if (apiKeyInput.isNotBlank()) {
-                                onSubmit(apiKeyInput.trim())
-                            }
-                        },
-                        modifier = Modifier.focusRequester(submitFocusRequester),
-                        shape = RoundedCornerShape(8.dp)
-                    ) { isFocused ->
-                        Text(
-                            text = "Link Folder",
-                            modifier = Modifier
-                                .background(
-                                    if (isFocused) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// Dialog-like overlay for initial Google OAuth limit warning popup
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-fun InitialWarningOverlay(
-    onDismiss: () -> Unit
-) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnClickOutside = false
-        )
-    ) {
-        val okButtonFocusRequester = remember { FocusRequester() }
-
-        LaunchedEffect(Unit) {
-            kotlinx.coroutines.delay(100)
-            okButtonFocusRequester.requestFocus()
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.75f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                modifier = Modifier
-                    .width(460.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Google Authentication Notice",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.error
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "If standard Google Sign-In fails due to app verification or user limits (100-user limit), you can bypass it by using your own Google Drive API Key.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                }
-                Spacer(modifier = Modifier.height(24.dp))
-
-                TVFocusableItem(
-                    onClick = onDismiss,
-                    modifier = Modifier.focusRequester(okButtonFocusRequester),
-                    shape = RoundedCornerShape(20.dp)
-                ) { isFocused ->
-                    Box(
-                        modifier = Modifier
-                            .height(40.dp)
-                            .background(
-                                if (isFocused) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                RoundedCornerShape(20.dp)
-                            )
-                            .padding(horizontal = 32.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Got It",
-                            color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 // Simple delay helper to avoid handler overhead
 private suspend fun delayMillis(ms: Long) {
