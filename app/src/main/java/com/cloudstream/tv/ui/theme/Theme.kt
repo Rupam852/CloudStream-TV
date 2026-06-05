@@ -29,15 +29,15 @@ val DarkOnBackground = Color(0xFFF1F5F9)
 val DarkOnSurface = Color(0xFFFFFFFF)
 val DarkOnSurfaceVariant = Color(0xFF94A3B8)
 
-val LightBackground = Color(0xFFF4F6FA)
-val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFE2E8F0)
-val LightPrimary = Color(0xFF2A52BE)      // Classic PlayStation Royal Blue
-val LightSecondary = Color(0xFF6366F1)    // Indigo
-val LightBorder = Color(0xFFCBD5E1)
-val LightOnBackground = Color(0xFF0F172A)
-val LightOnSurface = Color(0xFF1E293B)
-val LightOnSurfaceVariant = Color(0xFF64748B)
+val LightBackground = Color(0xFFF7F4EB)    // Soft, warm cream background (eye-comfort)
+val LightSurface = Color(0xFFEDE9DD)       // Softer warm cream surface (replaces harsh white)
+val LightSurfaceVariant = Color(0xFFDFDACD) // Muted warm cream variant
+val LightPrimary = Color(0xFF1A365D)       // Muted deep navy blue (less blue-light glare)
+val LightSecondary = Color(0xFF4338CA)     // Muted indigo
+val LightBorder = Color(0xFFD5CDBF)        // Warm soft grey-beige border
+val LightOnBackground = Color(0xFF2A2825)  // Muted charcoal-brown for softer contrast
+val LightOnSurface = Color(0xFF2E2C29)     // Muted charcoal
+val LightOnSurfaceVariant = Color(0xFF6E685E) // Brownish-grey for subtext
 
 val NeonCyanGlow = Color(0xFF00F5FF)
 val AccentPurpleGlow = Color(0xFF9F75FF)
