@@ -274,11 +274,11 @@ fun OnboardingScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Actions row (Link Folder & Google Authenticate button)
-            Row(
+            // Actions Column (Link Folder buttons stacked vertically to avoid screen clipping)
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalAlignment = Alignment.Start
             ) {
                 TVFocusableItem(
                     onClick = {
@@ -316,10 +316,11 @@ fun OnboardingScreen(
                 }
 
                 Text(
-                    text = "OR",
-                    style = MaterialTheme.typography.labelLarge,
+                    text = "— OR —",
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 16.dp)
                 )
 
                 TVFocusableItem(
