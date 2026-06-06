@@ -211,11 +211,13 @@ class DriveRepository(context: Context) {
         val refreshToken = prefs.getString(KEY_OAUTH_REFRESH_TOKEN, null)
         val expiry = prefs.getLong(KEY_OAUTH_EXPIRY, 0L)
         
-        if (accessToken == null) return null
+        if (accessToken == null && refreshToken == null) return null
         
         // Quick check without lock
-        val isExpired = System.currentTimeMillis() + 300000 > expiry
-        if (!isExpired) return accessToken
+        if (accessToken != null) {
+            val isExpired = System.currentTimeMillis() + 300000 > expiry
+            if (!isExpired) return accessToken
+        }
         
         // Synchronize token refresh using Mutex
         return tokenMutex.withLock {

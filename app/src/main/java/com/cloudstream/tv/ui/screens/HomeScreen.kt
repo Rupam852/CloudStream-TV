@@ -158,7 +158,11 @@ fun HomeScreen(
         loadingError = null
         try {
             val results = withContext(Dispatchers.IO) {
+                val isLoggedIn = repository.isLoggedIn()
                 val token = repository.getAccessToken()
+                if (isLoggedIn && token.isNullOrBlank()) {
+                    throw java.io.IOException("Google session expired or TV is offline. Please check your network connection.")
+                }
                 GoogleDriveClient.fetchFolderContents(folderId, repository.getApiKey(), token)
             }
             filesList = results
