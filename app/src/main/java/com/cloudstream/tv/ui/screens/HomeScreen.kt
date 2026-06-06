@@ -1,6 +1,7 @@
 package com.cloudstream.tv.ui.screens
 
 import android.widget.Toast
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -192,13 +193,17 @@ fun HomeScreen(
     // Auto-focus the main action button in error/empty states so the focus doesn't get stuck on the history shelf
     LaunchedEffect(isLoadingFiles, loadingError, savedFolders.size, filesList.size) {
         if (!isLoadingFiles) {
-            kotlinx.coroutines.delay(150)
-            try {
-                if (loadingError != null || savedFolders.isEmpty() || filesList.isEmpty()) {
-                    contentFocusRequester.requestFocus()
+            if (loadingError != null || savedFolders.isEmpty() || filesList.isEmpty()) {
+                // Attempt to focus with retries to handle layout binding latency on low-end TV devices
+                for (i in 1..5) {
+                    kotlinx.coroutines.delay(100L * i)
+                    try {
+                        contentFocusRequester.requestFocus()
+                        break
+                    } catch (e: Exception) {
+                        Log.w("HomeScreen", "Focus requester not yet attached on attempt $i")
+                    }
                 }
-            } catch (e: Exception) {
-                // Ignore layout state exceptions during rendering transitions
             }
         }
     }

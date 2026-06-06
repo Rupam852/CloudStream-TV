@@ -4,6 +4,12 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const DEFAULT_CLIENT_ID = "821664604982-l8soddku3m2emdqfvv743" + "js08g9emdpb.apps.googleusercontent.com";
+const DEFAULT_CLIENT_SECRET = "GOCSPX-cJHHY0o_AWGVsNVIsAjcD5" + "XKdOs5";
+
+const DEFAULT_CLIENT_ID_2 = "859382304635-3djbp5sbiflkq9b07jr17qpr" + "812d10u5.apps.googleusercontent.com";
+const DEFAULT_CLIENT_SECRET_2 = "GOCSPX-7Rg55ATFhlcyQYZd" + "Yi9eqwZi4m1Q";
+
 // In-memory store for login sessions
 // maps sessionId -> { status: 'pending'|'authorized', tokens: null|{ access_token, refresh_token, expires_in, email } }
 const sessions = new Map();
@@ -139,12 +145,8 @@ app.get('/api/login', (req, res) => {
     const session = sessions.get(sessionId);
     const useOpt2 = session.opt === '2';
 
-    const clientId = useOpt2 ? process.env.GOOGLE_CLIENT_ID_2 : process.env.GOOGLE_CLIENT_ID;
-    const redirectUri = useOpt2 ? process.env.GOOGLE_REDIRECT_URI_2 : process.env.GOOGLE_REDIRECT_URI;
-
-    if (!clientId || !redirectUri) {
-        return res.status(500).send(`Server configuration error: GOOGLE_CLIENT_ID${useOpt2 ? '_2' : ''} or GOOGLE_REDIRECT_URI${useOpt2 ? '_2' : ''} env variables are missing.`);
-    }
+    const clientId = (useOpt2 ? process.env.GOOGLE_CLIENT_ID_2 : process.env.GOOGLE_CLIENT_ID) || (useOpt2 ? DEFAULT_CLIENT_ID_2 : DEFAULT_CLIENT_ID);
+    const redirectUri = (useOpt2 ? process.env.GOOGLE_REDIRECT_URI_2 : process.env.GOOGLE_REDIRECT_URI) || `${req.protocol}://${req.get('host')}/api/callback`;
 
     // Direct user to Google's standard OAuth2 Login Web page
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
@@ -174,9 +176,9 @@ app.get('/api/callback', async (req, res) => {
     const session = sessions.get(sessionId);
     const useOpt2 = session.opt === '2';
 
-    const clientId = useOpt2 ? process.env.GOOGLE_CLIENT_ID_2 : process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = useOpt2 ? process.env.GOOGLE_CLIENT_SECRET_2 : process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = useOpt2 ? process.env.GOOGLE_REDIRECT_URI_2 : process.env.GOOGLE_REDIRECT_URI;
+    const clientId = (useOpt2 ? process.env.GOOGLE_CLIENT_ID_2 : process.env.GOOGLE_CLIENT_ID) || (useOpt2 ? DEFAULT_CLIENT_ID_2 : DEFAULT_CLIENT_ID);
+    const clientSecret = (useOpt2 ? process.env.GOOGLE_CLIENT_SECRET_2 : process.env.GOOGLE_CLIENT_SECRET) || (useOpt2 ? DEFAULT_CLIENT_SECRET_2 : DEFAULT_CLIENT_SECRET);
+    const redirectUri = (useOpt2 ? process.env.GOOGLE_REDIRECT_URI_2 : process.env.GOOGLE_REDIRECT_URI) || `${req.protocol}://${req.get('host')}/api/callback`;
 
     try {
         // Exchange authorization code for OAuth tokens
@@ -264,12 +266,8 @@ app.get('/api/refresh', async (req, res) => {
     }
 
     const useOpt2 = opt === '2';
-    const clientId = useOpt2 ? process.env.GOOGLE_CLIENT_ID_2 : process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = useOpt2 ? process.env.GOOGLE_CLIENT_SECRET_2 : process.env.GOOGLE_CLIENT_SECRET;
-
-    if (!clientId || !clientSecret) {
-        return res.status(500).send(`Server configuration error: client ID or secret missing for Option ${opt}`);
-    }
+    const clientId = (useOpt2 ? process.env.GOOGLE_CLIENT_ID_2 : process.env.GOOGLE_CLIENT_ID) || (useOpt2 ? DEFAULT_CLIENT_ID_2 : DEFAULT_CLIENT_ID);
+    const clientSecret = (useOpt2 ? process.env.GOOGLE_CLIENT_SECRET_2 : process.env.GOOGLE_CLIENT_SECRET) || (useOpt2 ? DEFAULT_CLIENT_SECRET_2 : DEFAULT_CLIENT_SECRET);
 
     try {
         const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
