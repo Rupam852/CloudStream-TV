@@ -7,7 +7,7 @@ import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.with
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -222,12 +222,11 @@ fun SlideshowScreen(
         AnimatedContent(
             targetState = activePhoto,
             transitionSpec = {
-                fadeIn(animationSpec = tween(700)) with fadeOut(animationSpec = tween(700))
+                fadeIn(animationSpec = tween(700)) togetherWith fadeOut(animationSpec = tween(700))
             },
             modifier = Modifier.fillMaxSize(),
             label = "photoFade"
         ) { photo ->
-            val context = LocalContext.current
             val imageModel = remember(photo, oauthToken, apiKey) {
                 val token = oauthToken
                 val key = apiKey

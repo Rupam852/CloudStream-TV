@@ -539,6 +539,7 @@ object GoogleDriveClient {
     // Render Backend Server Base URL. Replace this with your actual Render service URL!
     const val BACKEND_URL = "https://cloudstream-tv.onrender.com"
 
+    @Suppress("UNUSED_PARAMETER")
     suspend fun requestDeviceCode(clientId: String, opt: Int): DeviceCodeResponse = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$BACKEND_URL/api/session?opt=$opt")
@@ -566,6 +567,7 @@ object GoogleDriveClient {
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     suspend fun pollDeviceToken(clientId: String, clientSecret: String, deviceCode: String): TokenResponse? = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$BACKEND_URL/api/poll?session=$deviceCode")
@@ -647,8 +649,12 @@ object GoogleDriveClient {
         try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@withContext null
-                val body = response.body?.string() ?: null
-                Gson().fromJson(body, UserInfoResponse::class.java).email
+                val body = response.body?.string()
+                if (body != null) {
+                    Gson().fromJson(body, UserInfoResponse::class.java).email
+                } else {
+                    null
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to fetch user email", e)
