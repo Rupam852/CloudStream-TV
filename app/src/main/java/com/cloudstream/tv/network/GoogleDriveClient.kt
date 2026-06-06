@@ -609,16 +609,11 @@ object GoogleDriveClient {
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     suspend fun refreshAccessToken(clientId: String, clientSecret: String, refreshToken: String): TokenResult = withContext(Dispatchers.IO) {
-        val formBody = FormBody.Builder()
-            .add("client_id", clientId)
-            .add("client_secret", clientSecret)
-            .add("refresh_token", refreshToken)
-            .add("grant_type", "refresh_token")
-            .build()
+        val opt = if (clientId == DEFAULT_CLIENT_ID_2) "2" else "1"
         val request = Request.Builder()
-            .url("https://oauth2.googleapis.com/token")
-            .post(formBody)
+            .url("$BACKEND_URL/api/refresh?refresh_token=$refreshToken&opt=$opt")
             .build()
         try {
             client.newCall(request).execute().use { response ->
@@ -627,7 +622,7 @@ object GoogleDriveClient {
                     val tokenResponse = Gson().fromJson(body, TokenResponse::class.java)
                     TokenResult.Success(tokenResponse)
                 } else {
-                    Log.e(TAG, "Refresh token failed with HTTP ${response.code}: $body")
+                    Log.e(TAG, "Refresh token failed via backend with HTTP ${response.code}: $body")
                     if (response.code in 400..499) {
                         TokenResult.InvalidCredentials
                     } else {

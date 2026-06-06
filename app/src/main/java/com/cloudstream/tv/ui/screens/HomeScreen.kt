@@ -134,6 +134,7 @@ fun HomeScreen(
     val foldersListTriggerFocusRequester = remember { FocusRequester() }
     val lastFolderFocusRequester = remember { FocusRequester() }
     val addLinkFocusRequester = remember { FocusRequester() }
+    val contentFocusRequester = remember { FocusRequester() }
     
     // Backdrop blur representation with debouncing to eliminate fast-scrolling network load stutter
     var targetBackdropUrl by remember { mutableStateOf<String?>(null) }
@@ -185,6 +186,20 @@ fun HomeScreen(
             currentFolderId = fallback
         } else {
             loadFolder(currentFolderId)
+        }
+    }
+
+    // Auto-focus the main action button in error/empty states so the focus doesn't get stuck on the history shelf
+    LaunchedEffect(isLoadingFiles, loadingError, savedFolders.size, filesList.size) {
+        if (!isLoadingFiles) {
+            kotlinx.coroutines.delay(150)
+            try {
+                if (loadingError != null || savedFolders.isEmpty() || filesList.isEmpty()) {
+                    contentFocusRequester.requestFocus()
+                }
+            } catch (e: Exception) {
+                // Ignore layout state exceptions during rendering transitions
+            }
         }
     }
 
@@ -378,6 +393,7 @@ fun HomeScreen(
                                             loadFolder(currentFolderId)
                                         }
                                     },
+                                    modifier = Modifier.focusRequester(contentFocusRequester),
                                     shape = RoundedCornerShape(20.dp)
                                 ) { isFocused ->
                                     Box(
@@ -410,6 +426,7 @@ fun HomeScreen(
                                 Spacer(modifier = Modifier.height(16.dp))
                                 TVFocusableItem(
                                     onClick = { onNavigateToOnboarding() },
+                                    modifier = Modifier.focusRequester(contentFocusRequester),
                                     shape = RoundedCornerShape(20.dp)
                                 ) { isFocused ->
                                     Box(
@@ -443,6 +460,7 @@ fun HomeScreen(
                                 Spacer(modifier = Modifier.height(16.dp))
                                 TVFocusableItem(
                                     onClick = { showAddFolderDialog = true },
+                                    modifier = Modifier.focusRequester(contentFocusRequester),
                                     shape = RoundedCornerShape(20.dp)
                                 ) { isFocused ->
                                     Box(

@@ -254,6 +254,41 @@ app.get('/api/poll', (req, res) => {
     }
 });
 
+// Endpoint 5: TV app requests token refresh via backend
+app.get('/api/refresh', async (req, res) => {
+    const refreshToken = req.query.refresh_token;
+    const opt = req.query.opt || '1';
+
+    if (!refreshToken) {
+        return res.status(400).send('Missing refresh_token parameter');
+    }
+
+    const useOpt2 = opt === '2';
+    const clientId = useOpt2 ? process.env.GOOGLE_CLIENT_ID_2 : process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = useOpt2 ? process.env.GOOGLE_CLIENT_SECRET_2 : process.env.GOOGLE_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+        return res.status(500).send(`Server configuration error: client ID or secret missing for Option ${opt}`);
+    }
+
+    try {
+        const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
+            client_id: clientId,
+            client_secret: clientSecret,
+            refresh_token: refreshToken,
+            grant_type: 'refresh_token'
+        });
+
+        res.json(tokenResponse.data);
+    } catch (error) {
+        console.error('Failed to refresh token via backend', error.response ? error.response.data : error.message);
+        res.status(error.response ? error.response.status : 500).json(
+            error.response ? error.response.data : { error: 'Failed to refresh token' }
+        );
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Auth Bridge Server is running on port ${PORT}`);
 });
+
