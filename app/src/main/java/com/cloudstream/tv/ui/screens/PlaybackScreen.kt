@@ -229,6 +229,7 @@ fun PlaybackScreen(
     var playbackSpeed by remember { mutableStateOf(1.0f) }
 
     val playButtonFocusRequester = remember { FocusRequester() }
+    val timelineFocusRequester = remember { FocusRequester() }
 
     // Resolve URL on change
     LaunchedEffect(activeFile) {
@@ -391,11 +392,11 @@ fun PlaybackScreen(
         }
     }
 
-    // Focus play button on overlay reveal
+    // Focus timeline on overlay reveal
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) {
             delay(100)
-            playButtonFocusRequester.requestFocus()
+            timelineFocusRequester.requestFocus()
         }
     }
 
@@ -637,7 +638,11 @@ fun PlaybackScreen(
                             exoPlayer.seekTo(targetPos)
                             currentPosition = targetPos
                             showControls()
-                        }
+                        },
+                        onTogglePlayPause = {
+                            togglePlayPause()
+                        },
+                        modifier = Modifier.focusRequester(timelineFocusRequester)
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -890,6 +895,7 @@ private fun PlaybackTimeline(
     bufferPositionProvider: () -> Long,
     duration: Long,
     onSeek: (Long) -> Unit,
+    onTogglePlayPause: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val currentPosition = currentPositionProvider()
@@ -909,8 +915,13 @@ private fun PlaybackTimeline(
     
     TVFocusableItem(
         onClick = {
-            // Confirm seek immediately on click/enter
-            tempSeekPosition?.let { onSeek(it) }
+            // If tempSeekPosition is not null, confirm seek. Otherwise, toggle Play/Pause
+            if (tempSeekPosition != null) {
+                onSeek(tempSeekPosition!!)
+                tempSeekPosition = null
+            } else {
+                onTogglePlayPause()
+            }
         },
         shape = RoundedCornerShape(8.dp),
         scaleOnFocus = 1.0f,
