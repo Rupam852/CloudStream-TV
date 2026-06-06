@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -48,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -630,7 +632,12 @@ fun PlaybackScreen(
                     PlaybackTimeline(
                         currentPositionProvider = { currentPosition },
                         bufferPositionProvider = { bufferPosition },
-                        duration = duration
+                        duration = duration,
+                        onSeek = { targetPos ->
+                            exoPlayer.seekTo(targetPos)
+                            currentPosition = targetPos
+                            showControls()
+                        }
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -876,54 +883,151 @@ private fun IconButton(
     }
 }
 
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun PlaybackTimeline(
     currentPositionProvider: () -> Long,
     bufferPositionProvider: () -> Long,
     duration: Long,
+    onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val currentPosition = currentPositionProvider()
     val bufferPosition = bufferPositionProvider()
     
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = formatTime(currentPosition),
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.8f)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Box(
+    var isFocused by remember { mutableStateOf(false) }
+    var tempSeekPosition by remember { mutableStateOf<Long?>(null) }
+    
+    val displayPosition = tempSeekPosition ?: currentPosition
+    
+    // Debounce actual seek player updates
+    LaunchedEffect(tempSeekPosition) {
+        val targetPos = tempSeekPosition ?: return@LaunchedEffect
+        delay(400)
+        onSeek(targetPos)
+    }
+    
+    TVFocusableItem(
+        onClick = {
+            // Confirm seek immediately on click/enter
+            tempSeekPosition?.let { onSeek(it) }
+        },
+        shape = RoundedCornerShape(8.dp),
+        scaleOnFocus = 1.0f,
+        borderColor = Color.Transparent,
+        glowColor = Color.Transparent,
+        containerColor = Color.Transparent,
+        focusedContainerColor = Color.Transparent,
+        modifier = modifier
+            .fillMaxWidth()
+            .onFocusChanged { focusState ->
+                isFocused = focusState.isFocused
+                if (focusState.isFocused) {
+                    tempSeekPosition = currentPosition
+                } else {
+                    tempSeekPosition = null
+                }
+            }
+            .onPreviewKeyEvent { keyEvent ->
+                if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
+                    when (keyEvent.nativeKeyEvent.keyCode) {
+                        KeyEvent.KEYCODE_DPAD_LEFT -> {
+                            val step = (duration / 100).coerceIn(5000L, 30000L)
+                            val currentTemp = tempSeekPosition ?: currentPosition
+                            tempSeekPosition = (currentTemp - step).coerceAtLeast(0L)
+                            true
+                        }
+                        KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                            val step = (duration / 100).coerceIn(5000L, 30000L)
+                            val currentTemp = tempSeekPosition ?: currentPosition
+                            tempSeekPosition = (currentTemp + step).coerceAtMost(duration)
+                            true
+                        }
+                        else -> false
+                    }
+                } else false
+            }
+    ) { _ ->
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(Color.White.copy(alpha = 0.2f))
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            val bufferFraction = if (duration > 0) bufferPosition.toFloat() / duration else 0f
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(bufferFraction)
-                    .height(6.dp)
-                    .background(Color.White.copy(alpha = 0.2f))
+            Text(
+                text = formatTime(displayPosition),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isFocused) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.8f),
+                fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Normal
             )
-            val progressFraction = if (duration > 0) currentPosition.toFloat() / duration else 0f
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            // Progress Bar Track
+            val height = if (isFocused) 8.dp else 4.dp
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(progressFraction)
-                    .height(6.dp)
-                    .background(MaterialTheme.colorScheme.primary)
+                    .weight(1f)
+                    .height(24.dp), // larger height to allow thumb to draw without clipping
+                contentAlignment = Alignment.CenterStart
+            ) {
+                // Track Background
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(height)
+                        .clip(RoundedCornerShape(height / 2))
+                        .background(Color.White.copy(alpha = 0.2f))
+                )
+                
+                // Buffer bar
+                val bufferFraction = if (duration > 0) bufferPosition.toFloat() / duration else 0f
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(bufferFraction)
+                        .height(height)
+                        .clip(RoundedCornerShape(height / 2))
+                        .background(Color.White.copy(alpha = 0.2f))
+                )
+                
+                // Progress bar
+                val progressFraction = if (duration > 0) displayPosition.toFloat() / duration else 0f
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progressFraction)
+                        .height(height)
+                        .clip(RoundedCornerShape(height / 2))
+                        .background(
+                            if (isFocused) MaterialTheme.colorScheme.primary 
+                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                        )
+                )
+                
+                // Thumb circle (Visible only when focused)
+                if (isFocused) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(progressFraction)
+                            .height(height),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .background(Color.White, CircleShape)
+                                .align(Alignment.CenterEnd)
+                                .offset(x = 8.dp) // shift by half of thumb size
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = formatTime(duration),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.8f)
             )
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = formatTime(duration),
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.8f)
-        )
     }
 }
 
