@@ -100,6 +100,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun HomeScreen(
     repository: DriveRepository,
+    lastPlayedFileId: String? = null,
     onPlayVideo: (DriveFile, List<DriveFile>) -> Unit,
     onStartSlideshow: (DriveFile, List<DriveFile>) -> Unit,
     onNavigateToOnboarding: () -> Unit,
@@ -136,6 +137,7 @@ fun HomeScreen(
     val lastFolderFocusRequester = remember { FocusRequester() }
     val addLinkFocusRequester = remember { FocusRequester() }
     val contentFocusRequester = remember { FocusRequester() }
+    val fileFocusRequesters = remember { mutableMapOf<String, FocusRequester>() }
     
     // Backdrop blur representation with debouncing to eliminate fast-scrolling network load stutter
     var targetBackdropUrl by remember { mutableStateOf<String?>(null) }
@@ -202,6 +204,25 @@ fun HomeScreen(
                         break
                     } catch (e: Exception) {
                         Log.w("HomeScreen", "Focus requester not yet attached on attempt $i")
+                    }
+                }
+            }
+        }
+    }
+
+    // Restore focus to the last played/viewed file once the files list is loaded successfully
+    LaunchedEffect(isLoadingFiles, filesList.size, lastPlayedFileId) {
+        if (!isLoadingFiles && lastPlayedFileId != null && filesList.isNotEmpty()) {
+            val hasFile = filesList.any { it.id == lastPlayedFileId }
+            if (hasFile) {
+                // Attempt to focus the specific file item with retries to handle grid/list mounting latency
+                for (i in 1..5) {
+                    kotlinx.coroutines.delay(100L * i)
+                    try {
+                        fileFocusRequesters[lastPlayedFileId]?.requestFocus()
+                        break
+                    } catch (e: Exception) {
+                        Log.w("HomeScreen", "Failed to focus last played file $lastPlayedFileId on attempt $i")
                     }
                 }
             }
@@ -500,8 +521,10 @@ fun HomeScreen(
                                             file.isVideo -> Icons.Default.Movie
                                             else -> Icons.Default.Image
                                         }
+                                        val requester = fileFocusRequesters.getOrPut(file.id) { FocusRequester() }
                                         TVCard(
                                             title = file.name,
+                                            modifier = Modifier.focusRequester(requester),
                                             subtitle = when {
                                                 file.isFolder -> "Folder"
                                                 file.isVideo -> "Video"
@@ -563,6 +586,7 @@ fun HomeScreen(
                                             file.isVideo -> Icons.Default.Movie
                                             else -> Icons.Default.Image
                                         }
+                                        val requester = fileFocusRequesters.getOrPut(file.id) { FocusRequester() }
                                         TVFocusableItem(
                                             onClick = {
                                                 if (file.isFolder) {
@@ -589,7 +613,9 @@ fun HomeScreen(
                                             scaleOnFocus = 1.02f,
                                             containerColor = MaterialTheme.colorScheme.surface,
                                             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                            modifier = Modifier.fillMaxWidth()
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .focusRequester(requester)
                                         ) { _ ->
                                             Row(
                                                 modifier = Modifier

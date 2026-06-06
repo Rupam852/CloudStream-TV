@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
                     Screen.Home -> {
                         HomeScreen(
                             repository = repository,
+                            lastPlayedFileId = activeFile?.id,
                             onPlayVideo = { video, playlist ->
                                 activeFile = video
                                 mediaPlaylist = playlist
