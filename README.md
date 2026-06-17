@@ -108,7 +108,7 @@ You can input either the full sharing link or the folder ID directly:
 
 ## 🌐 Architecture & OAuth Flow
 
-The project includes a lightweight Node.js/Express authorization server in the `backend/` directory. It functions as an authorization bridge to handle Google OAuth 2.0 credentials safely for TV devices.
+The project includes a serverless authorization backend hosted on **Supabase Edge Functions** (under `supabase/functions/auth-bridge/`). It functions as an authorization bridge to handle Google OAuth 2.0 credentials safely for TV devices.
 
 ### Auth Sequence Diagram
 
@@ -116,7 +116,7 @@ The project includes a lightweight Node.js/Express authorization server in the `
 sequenceDiagram
     autonumber
     participant TV as TV App
-    participant BE as Node.js Backend Bridge
+    participant BE as Supabase Edge Function
     participant GO as Google OAuth Server
     participant PH as User Phone/PC
 
@@ -129,23 +129,24 @@ sequenceDiagram
     PH->>GO: Grant Read-only Drive access
     GO-->>BE: Redirect to /api/callback with Auth Code
     BE->>GO: Exchange Auth Code for Access & Refresh Tokens
-    BE->>BE: Securely cache tokens under session_id
+    BE->>BE: Store tokens in Supabase Database (sessions table)
     loop Polling (every 3 seconds)
         TV->>BE: Poll /api/poll?session=ID
     end
     BE-->>TV: Return Access & Refresh Tokens
     TV->>TV: Encrypt & save tokens to Local Secure Preferences
-    BE->>BE: Clear session_id cache from memory
+    BE->>BE: Clear session tokens from database (status: authorized)
 ```
 
-### Environment Configuration
-To deploy the backend (e.g. to Render, Heroku, or Vercel), configure:
-- `GOOGLE_CLIENT_ID`: Google Developer Console OAuth Web Client ID.
-- `GOOGLE_CLIENT_SECRET`: Google Developer Console OAuth Web Client Secret.
-- `GOOGLE_REDIRECT_URI`: The authorized redirect callback URL (e.g., `https://your-app.onrender.com/api/callback`).
+### Environment Configuration (Supabase Secrets)
+To deploy the backend to Supabase, configure the following secrets using the Supabase CLI (`supabase secrets set`):
+- `GOOGLE_CLIENT_ID`: Google Developer Console OAuth Web Client ID (Option 1).
+- `GOOGLE_CLIENT_SECRET`: Google Developer Console OAuth Web Client Secret (Option 1).
+- `GOOGLE_CLIENT_ID_2`: Google Developer Console OAuth Web Client ID (Option 2).
+- `GOOGLE_CLIENT_SECRET_2`: Google Developer Console OAuth Web Client Secret (Option 2).
 
 > [!IMPORTANT]
-> **Android App Backend Linkage**: If you deploy your custom auth server instance, update the `BACKEND_URL` constant inside [GoogleDriveClient.kt](file:///d:/PROJECT/CloudStream%20TV/app/src/main/java/com/cloudstream/tv/network/GoogleDriveClient.kt#L525) to point to your new backend domain before building.
+> **Android App Backend Linkage**: The app's `BACKEND_URL` constant inside [GoogleDriveClient.kt](file:///d:/PROJECT/CloudStream%20TV/app/src/main/java/com/cloudstream/tv/network/GoogleDriveClient.kt#L540) is configured to point to your Supabase Edge Function URL.
 
 ---
 
@@ -153,9 +154,10 @@ To deploy the backend (e.g. to Render, Heroku, or Vercel), configure:
 
 ```bash
 ├── app/                  # Android TV Kotlin codebase (Jetpack Compose, Media3)
-├── backend/              # Node.js Express OAuth bridge
+├── supabase/             # Supabase Edge Functions & Database schema configuration
 ├── website/              # Frontend landing page & privacy policy
 ├── assets/               # Banner, logo, and graphic assets
+├── backend/              # [Deprecated] Legacy Node.js Express OAuth bridge
 ├── app-debug.apk         # Compiled debug APK (local root)
 └── app-release.apk       # Compiled optimized production APK (local root)
 ```

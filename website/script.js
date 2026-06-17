@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         3: {
             icon: '🔐',
             title: 'Step 3: Google Authenticate (Option 1 or Option 2)',
-            description: 'If Option 1 reaches Google\'s concurrent user limit, choose Option 2 to authenticate securely. Scan the QR code with your phone/PC to go to our Render authentication website, enter the 6-character code shown on your TV, and sign in to connect your Google Account.'
+            description: 'If Option 1 reaches Google\'s concurrent user limit, choose Option 2 to authenticate securely. Scan the QR code with your phone/PC to open the authentication page, enter the 6-character code shown on your TV, and sign in to connect your Google Account.'
         },
         4: {
             icon: '➕',
