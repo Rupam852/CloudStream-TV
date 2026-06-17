@@ -259,10 +259,12 @@ serve(async (req) => {
     return new Response('Not Found', { status: 404 });
 
   } catch (error) {
-    console.error('Edge Function Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error('Edge Function Error:', err);
+    return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
+
 });
