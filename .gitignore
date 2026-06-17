@@ -13,3 +13,4 @@
 local.properties
 app/build
 backend/node_modules
+supabase/.temp/

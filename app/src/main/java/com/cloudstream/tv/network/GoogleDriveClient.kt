@@ -536,8 +536,8 @@ object GoogleDriveClient {
     const val DEFAULT_CLIENT_ID_2 = "859382304635-3djbp5sbiflkq9b07jr17qpr" + "812d10u5.apps.googleusercontent.com"
     const val DEFAULT_CLIENT_SECRET_2 = "GOCSPX-7Rg55ATFhlcyQYZd" + "Yi9eqwZi4m1Q"
 
-    // Render Backend Server Base URL. Replace this with your actual Render service URL!
-    const val BACKEND_URL = "https://cloudstream-tv.onrender.com"
+    // Supabase Edge Function Base URL
+    const val BACKEND_URL = "https://tiqebjoqnbaqchljigqz.supabase.co/functions/v1/auth-bridge"
 
     @Suppress("UNUSED_PARAMETER")
     suspend fun requestDeviceCode(clientId: String, opt: Int): DeviceCodeResponse = withContext(Dispatchers.IO) {
