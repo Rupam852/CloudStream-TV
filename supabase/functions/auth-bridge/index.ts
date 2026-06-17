@@ -244,7 +244,20 @@ serve(async (req) => {
       });
     }
 
+
+    // 6. Health check / keep-alive ping (used by cron-job.org to prevent Supabase pause)
+    if (path === '/health' || path === '/ping' || path === '/api/health') {
+      return new Response(JSON.stringify({
+        status: 'ok',
+        service: 'CloudStream TV Auth Bridge',
+        timestamp: new Date().toISOString()
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     return new Response('Not Found', { status: 404 });
+
   } catch (error) {
     console.error('Edge Function Error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
