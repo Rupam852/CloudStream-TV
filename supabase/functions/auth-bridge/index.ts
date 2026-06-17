@@ -2,6 +2,7 @@
 // Deno runtime — runs on Supabase Edge Functions (not Node.js)
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { SMTPClient } from "https://deno.land/x/denomailer/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -172,11 +173,10 @@ serve(async (req) => {
           if (userError) {
             console.error('Failed to save user info to permanent table:', userError);
           } else {
-            console.log('Saved user info to permanent table for:', email);
-            const brevoApiKey = Deno.env.get('BREVO_API_KEY');
-            const senderEmail = Deno.env.get('SENDER_EMAIL');
-            if (brevoApiKey && senderEmail) {
-              await sendWelcomeEmail(brevoApiKey, senderEmail, email, name);
+            const smtpUser = Deno.env.get('SMTP_USER');
+            const smtpPass = Deno.env.get('SMTP_PASS');
+            if (smtpUser && smtpPass) {
+              await sendWelcomeEmail(smtpUser, smtpPass, email, name);
             }
           }
         } catch (err) {
@@ -300,61 +300,61 @@ serve(async (req) => {
 
 });
 
-async function sendWelcomeEmail(apiKey: string, senderEmail: string, recipientEmail: string, recipientName: string | null) {
+async function sendWelcomeEmail(smtpUser: string, smtpPass: string, recipientEmail: string, recipientName: string | null) {
   try {
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'accept': 'application/json',
-        'api-key': apiKey,
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        sender: { name: 'CloudStream TV', email: senderEmail },
-        to: [{ email: recipientEmail, name: recipientName || 'User' }],
-        subject: 'Welcome to CloudStream TV!',
-        htmlContent: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-            <div style="text-align: center; margin-bottom: 25px;">
-              <h1 style="color: #6366f1; margin: 0; font-size: 28px; font-weight: 700;">CloudStream TV</h1>
-              <p style="color: #6b7280; font-size: 14px; margin-top: 5px;">Your Google Drive Streamer</p>
-            </div>
-            
-            <div style="color: #374151; line-height: 1.6; font-size: 16px;">
-              <p>Hello <strong>\${recipientName || 'User'}</strong>,</p>
-              <p>Welcome to <strong>CloudStream TV</strong>! 🎉</p>
-              <p>You have successfully authenticated your Google account on your Android TV / Google TV. You can now access and stream your video library and play beautiful photo slideshows directly from your linked Google Drive folders on the big screen.</p>
-              
-              <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="margin-top: 0; color: #1f2937; font-size: 16px;">What you can do now:</h3>
-                <ul style="padding-left: 20px; margin-bottom: 0;">
-                  <li>Stream high-quality videos smoothly with ExoPlayer</li>
-                  <li>Play gorgeous photo slideshows from any drive folder</li>
-                  <li>Link multiple folders easily using the TV sidebar menu</li>
-                </ul>
-              </div>
-              
-              <p>If you did not authorize this connection, please secure your Google Account settings immediately.</p>
-            </div>
-            
-            <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-            
-            <div style="text-align: center; color: #9ca3af; font-size: 12px;">
-              <p>© 2026 CloudStream TV. All rights reserved.</p>
-              <p>Support: <a href="mailto:cloudstreamtvsupport@gmail.com" style="color: #6366f1; text-decoration: none;">cloudstreamtvsupport@gmail.com</a></p>
-            </div>
-          </div>
-        `
-      })
+    const client = new SMTPClient({
+      connection: {
+        hostname: "smtp.gmail.com",
+        port: 465,
+        tls: true,
+        auth: {
+          username: smtpUser,
+          password: smtpPass
+        }
+      }
     });
 
-    if (res.ok) {
-      console.log('Welcome email sent successfully via Brevo to:', recipientEmail);
-    } else {
-      const errText = await res.text();
-      console.error('Brevo API error:', errText);
-    }
+    await client.send({
+      from: `CloudStream TV <${smtpUser}>`,
+      to: recipientEmail,
+      subject: "Welcome to CloudStream TV!",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+          <div style="text-align: center; margin-bottom: 25px;">
+            <h1 style="color: #6366f1; margin: 0; font-size: 28px; font-weight: 700;">CloudStream TV</h1>
+            <p style="color: #6b7280; font-size: 14px; margin-top: 5px;">Your Google Drive Streamer</p>
+          </div>
+          
+          <div style="color: #374151; line-height: 1.6; font-size: 16px;">
+            <p>Hello <strong>${recipientName || 'User'}</strong>,</p>
+            <p>Welcome to <strong>CloudStream TV</strong>! 🎉</p>
+            <p>You have successfully authenticated your Google account on your Android TV / Google TV. You can now access and stream your video library and play beautiful photo slideshows directly from your linked Google Drive folders on the big screen.</p>
+            
+            <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0; color: #1f2937; font-size: 16px;">What you can do now:</h3>
+              <ul style="padding-left: 20px; margin-bottom: 0;">
+                <li>Stream high-quality videos smoothly with ExoPlayer</li>
+                <li>Play gorgeous photo slideshows from any drive folder</li>
+                <li>Link multiple folders easily using the TV sidebar menu</li>
+              </ul>
+            </div>
+            
+            <p>If you did not authorize this connection, please secure your Google Account settings immediately.</p>
+          </div>
+          
+          <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+          
+          <div style="text-align: center; color: #9ca3af; font-size: 12px;">
+            <p>© 2026 CloudStream TV. All rights reserved.</p>
+            <p>Support: <a href="mailto:cloudstreamtvsupport@gmail.com" style="color: #6366f1; text-decoration: none;">cloudstreamtvsupport@gmail.com</a></p>
+          </div>
+        </div>
+      `
+    });
+
+    await client.close();
+    console.log('Welcome email sent successfully via Gmail SMTP to:', recipientEmail);
   } catch (err) {
-    console.error('Exception in sendWelcomeEmail:', err);
+    console.error('Exception in sendWelcomeEmail via SMTP:', err);
   }
 }
