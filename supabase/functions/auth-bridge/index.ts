@@ -173,9 +173,10 @@ serve(async (req) => {
             console.error('Failed to save user info to permanent table:', userError);
           } else {
             console.log('Saved user info to permanent table for:', email);
-            const resendApiKey = Deno.env.get('RESEND_API_KEY');
-            if (resendApiKey) {
-              await sendWelcomeEmail(resendApiKey, email, name);
+            const brevoApiKey = Deno.env.get('BREVO_API_KEY');
+            const senderEmail = Deno.env.get('SENDER_EMAIL');
+            if (brevoApiKey && senderEmail) {
+              await sendWelcomeEmail(brevoApiKey, senderEmail, email, name);
             }
           }
         } catch (err) {
@@ -299,19 +300,20 @@ serve(async (req) => {
 
 });
 
-async function sendWelcomeEmail(apiKey: string, email: string, name: string | null) {
+async function sendWelcomeEmail(apiKey: string, senderEmail: string, recipientEmail: string, recipientName: string | null) {
   try {
-    const res = await fetch('https://api.resend.com/emails', {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'accept': 'application/json',
+        'api-key': apiKey,
+        'content-type': 'application/json'
       },
       body: JSON.stringify({
-        from: 'CloudStream TV <onboarding@resend.dev>',
-        to: [email],
+        sender: { name: 'CloudStream TV', email: senderEmail },
+        to: [{ email: recipientEmail, name: recipientName || 'User' }],
         subject: 'Welcome to CloudStream TV!',
-        html: `
+        htmlContent: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
             <div style="text-align: center; margin-bottom: 25px;">
               <h1 style="color: #6366f1; margin: 0; font-size: 28px; font-weight: 700;">CloudStream TV</h1>
@@ -319,7 +321,7 @@ async function sendWelcomeEmail(apiKey: string, email: string, name: string | nu
             </div>
             
             <div style="color: #374151; line-height: 1.6; font-size: 16px;">
-              <p>Hello <strong>\${name || 'User'}</strong>,</p>
+              <p>Hello <strong>\${recipientName || 'User'}</strong>,</p>
               <p>Welcome to <strong>CloudStream TV</strong>! 🎉</p>
               <p>You have successfully authenticated your Google account on your Android TV / Google TV. You can now access and stream your video library and play beautiful photo slideshows directly from your linked Google Drive folders on the big screen.</p>
               
@@ -347,10 +349,10 @@ async function sendWelcomeEmail(apiKey: string, email: string, name: string | nu
     });
 
     if (res.ok) {
-      console.log('Welcome email sent successfully to:', email);
+      console.log('Welcome email sent successfully via Brevo to:', recipientEmail);
     } else {
       const errText = await res.text();
-      console.error('Resend API error:', errText);
+      console.error('Brevo API error:', errText);
     }
   } catch (err) {
     console.error('Exception in sendWelcomeEmail:', err);
