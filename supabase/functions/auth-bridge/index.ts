@@ -132,8 +132,10 @@ serve(async (req) => {
 
       const tokens = await tokenRes.json();
 
-      // Fetch user's email address
+      // Fetch user's email address and profile details
       let email = null;
+      let name = null;
+      let picture = null;
       try {
         const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
           headers: { Authorization: `Bearer ${tokens.access_token}` }
@@ -141,9 +143,11 @@ serve(async (req) => {
         if (userInfoRes.ok) {
           const userInfo = await userInfoRes.json();
           email = userInfo.email;
+          name = userInfo.name;
+          picture = userInfo.picture;
         }
       } catch (e) {
-        console.error('Failed to retrieve user email', e);
+        console.error('Failed to retrieve user profile', e);
       }
 
       // Save credentials & authorize session
@@ -154,6 +158,30 @@ serve(async (req) => {
         expires_in: tokens.expires_in,
         email: email
       }).eq('id', sessionId);
+
+      // Save user to permanent users table & send welcome email
+      if (email) {
+        try {
+          const { error: userError } = await supabase.from('users').upsert({
+            email: email,
+            name: name,
+            profile_picture: picture,
+            last_login_at: new Date().toISOString()
+          }, { onConflict: 'email' });
+
+          if (userError) {
+            console.error('Failed to save user info to permanent table:', userError);
+          } else {
+            console.log('Saved user info to permanent table for:', email);
+            const resendApiKey = Deno.env.get('RESEND_API_KEY');
+            if (resendApiKey) {
+              await sendWelcomeEmail(resendApiKey, email, name);
+            }
+          }
+        } catch (err) {
+          console.error('Error in saving permanent user info / sending email:', err);
+        }
+      }
 
       return new Response(`
         <div style="font-family: sans-serif; text-align: center; margin-top: 100px; padding: 20px;">
@@ -270,3 +298,61 @@ serve(async (req) => {
   }
 
 });
+
+async function sendWelcomeEmail(apiKey: string, email: string, name: string | null) {
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        from: 'CloudStream TV <onboarding@resend.dev>',
+        to: [email],
+        subject: 'Welcome to CloudStream TV!',
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <div style="text-align: center; margin-bottom: 25px;">
+              <h1 style="color: #6366f1; margin: 0; font-size: 28px; font-weight: 700;">CloudStream TV</h1>
+              <p style="color: #6b7280; font-size: 14px; margin-top: 5px;">Your Google Drive Streamer</p>
+            </div>
+            
+            <div style="color: #374151; line-height: 1.6; font-size: 16px;">
+              <p>Hello <strong>\${name || 'User'}</strong>,</p>
+              <p>Welcome to <strong>CloudStream TV</strong>! 🎉</p>
+              <p>You have successfully authenticated your Google account on your Android TV / Google TV. You can now access and stream your video library and play beautiful photo slideshows directly from your linked Google Drive folders on the big screen.</p>
+              
+              <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="margin-top: 0; color: #1f2937; font-size: 16px;">What you can do now:</h3>
+                <ul style="padding-left: 20px; margin-bottom: 0;">
+                  <li>Stream high-quality videos smoothly with ExoPlayer</li>
+                  <li>Play gorgeous photo slideshows from any drive folder</li>
+                  <li>Link multiple folders easily using the TV sidebar menu</li>
+                </ul>
+              </div>
+              
+              <p>If you did not authorize this connection, please secure your Google Account settings immediately.</p>
+            </div>
+            
+            <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+            
+            <div style="text-align: center; color: #9ca3af; font-size: 12px;">
+              <p>© 2026 CloudStream TV. All rights reserved.</p>
+              <p>Support: <a href="mailto:cloudstreamtvsupport@gmail.com" style="color: #6366f1; text-decoration: none;">cloudstreamtvsupport@gmail.com</a></p>
+            </div>
+          </div>
+        `
+      })
+    });
+
+    if (res.ok) {
+      console.log('Welcome email sent successfully to:', email);
+    } else {
+      const errText = await res.text();
+      console.error('Resend API error:', errText);
+    }
+  } catch (err) {
+    console.error('Exception in sendWelcomeEmail:', err);
+  }
+}
