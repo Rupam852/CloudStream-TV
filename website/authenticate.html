@@ -276,6 +276,29 @@
             box-shadow: 0 12px 24px rgba(239, 68, 68, 0.4);
         }
 
+        .btn-secondary {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            padding: 12px 20px;
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            flex: 1;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
         .error-message {
             color: #ef4444;
             font-size: 14px;
@@ -333,6 +356,10 @@
         <p class="subtitle">Hello <strong id="success-user-name" style="color:#fff;">User</strong>, you have successfully authenticated your Google account. CloudStream TV has been linked.</p>
         <div class="status-badge">✓ Connected to TV</div>
         <button id="close-btn" class="btn btn-success">Close this Tab</button>
+        <div style="margin-top: 16px; display: flex; gap: 12px;">
+            <a href="/" class="btn-secondary">Go to Home</a>
+            <a href="/authenticate" class="btn-secondary">Link Another TV</a>
+        </div>
     </div>
 
     <!-- 3. Error Status Card -->
