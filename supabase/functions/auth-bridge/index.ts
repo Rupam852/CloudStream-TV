@@ -78,14 +78,20 @@ serve(async (req) => {
       const protocol = url.host.startsWith('localhost') || url.host.startsWith('127.0.0.1') ? 'http:' : 'https:';
       const redirectUri = `${protocol}//${url.host}/functions/v1/auth-bridge/callback`;
 
+      const forceConsent = url.searchParams.get('force_consent') === 'true';
+      const promptParam = forceConsent ? 'consent' : 'select_account';
+      const stateParam = forceConsent ? `${sessionId}:force` : `${sessionId}:normal`;
+
+      // Change prompt=consent to prompt=select_account so Google doesn't ask for permission scopes again if already consented.
+      // If force_consent is true, we force prompt=consent to retrieve a new refresh token.
       const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${encodeURIComponent(clientId)}&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `response_type=code&` +
         `scope=${encodeURIComponent('https://www.googleapis.com/auth/drive.readonly email profile')}&` +
         `access_type=offline&` +
-        `prompt=consent&` +
-        `state=${encodeURIComponent(sessionId)}`;
+        `prompt=${promptParam}&` +
+        `state=${encodeURIComponent(stateParam)}`;
 
       return Response.redirect(googleAuthUrl, 302);
     }
@@ -93,11 +99,15 @@ serve(async (req) => {
     // 3. Callback redirect URI from Google OAuth
     if (path === '/callback' || path === '/api/callback') {
       const code = url.searchParams.get('code');
-      const sessionId = url.searchParams.get('state')?.trim().toUpperCase();
+      const stateStr = url.searchParams.get('state')?.trim() || '';
 
-      if (!code || !sessionId) {
+      if (!code || !stateStr) {
         return Response.redirect('https://cloudstream-tv.vercel.app/authenticate?status=error&message=Missing%20authorization%20code%20or%20state%20from%20Google.%20Please%20try%20logging%20in%20again.', 302);
       }
+
+      const parts = stateStr.split(':');
+      const sessionId = parts[0].toUpperCase();
+      const flowType = parts[1] || 'normal';
 
       const { data: session, error } = await supabase
         .from('sessions')
@@ -153,24 +163,44 @@ serve(async (req) => {
         console.error('Failed to retrieve user profile', e);
       }
 
-      // Save credentials & authorize session
-      await supabase.from('sessions').update({
-        status: 'authorized',
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expires_in: tokens.expires_in,
-        email: email
-      }).eq('id', sessionId);
+      // If Google did not return a refresh token (because the user already authorized previously),
+      // we retrieve the stored refresh token from our database users table.
+      let finalRefreshToken = tokens.refresh_token;
 
-      // Save user to permanent users table & send welcome email
       if (email) {
+        if (!finalRefreshToken) {
+          const { data: dbUser } = await supabase
+            .from('users')
+            .select('refresh_token')
+            .eq('email', email)
+            .maybeSingle();
+          if (dbUser && dbUser.refresh_token) {
+            finalRefreshToken = dbUser.refresh_token;
+            console.log('Retrieved saved refresh token from database for:', email);
+          }
+        }
+
+        // If we still don't have a refresh token (both Google and database have none),
+        // and we haven't already forced consent, redirect back to login with force_consent=true.
+        if (!finalRefreshToken && flowType !== 'force') {
+          console.log(`No refresh token found for ${email}. Redirecting to force consent.`);
+          const forceRedirectUrl = `${protocol}//${url.host}/functions/v1/auth-bridge/login?session=${sessionId}&force_consent=true`;
+          return Response.redirect(forceRedirectUrl, 302);
+        }
+
+        // Save user to permanent users table (only update refresh_token if a new one was returned)
         try {
-          const { error: userError } = await supabase.from('users').upsert({
+          const userUpdate: any = {
             email: email,
             name: name,
             profile_picture: picture,
             last_login_at: new Date().toISOString()
-          }, { onConflict: 'email' });
+          };
+          if (tokens.refresh_token) {
+            userUpdate.refresh_token = tokens.refresh_token;
+          }
+
+          const { error: userError } = await supabase.from('users').upsert(userUpdate, { onConflict: 'email' });
 
           if (userError) {
             console.error('Failed to save user info to permanent table:', userError);
@@ -185,6 +215,15 @@ serve(async (req) => {
           console.error('Error in saving permanent user info / sending email:', err);
         }
       }
+
+      // Save credentials & authorize session (use the resolved finalRefreshToken)
+      await supabase.from('sessions').update({
+        status: 'authorized',
+        access_token: tokens.access_token,
+        refresh_token: finalRefreshToken,
+        expires_in: tokens.expires_in,
+        email: email
+      }).eq('id', sessionId);
 
       const encodedName = encodeURIComponent(name || 'User');
       return Response.redirect(`https://cloudstream-tv.vercel.app/authenticate?status=success&name=${encodedName}`, 302);

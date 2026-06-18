@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     email TEXT PRIMARY KEY,
     name TEXT,
     profile_picture TEXT,
+    refresh_token TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     last_login_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
