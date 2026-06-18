@@ -355,10 +355,9 @@
         <h1>Success!</h1>
         <p class="subtitle">Hello <strong id="success-user-name" style="color:#fff;">User</strong>, you have successfully authenticated your Google account. CloudStream TV has been linked.</p>
         <div class="status-badge">✓ Connected to TV</div>
-        <button id="close-btn" class="btn btn-success">Close this Tab</button>
-        <div style="margin-top: 16px; display: flex; gap: 12px;">
-            <a href="/" class="btn-secondary">Go to Home</a>
-            <a href="/authenticate" class="btn-secondary">Link Another TV</a>
+        <div style="margin-top: 24px; display: flex; gap: 12px;">
+            <a href="/" class="btn btn-success" style="text-decoration: none; flex: 1; margin: 0; box-shadow: 0 8px 20px var(--success-glow);">Go to Home</a>
+            <a href="/authenticate" class="btn-secondary" style="flex: 1;">Link Another TV</a>
         </div>
     </div>
 
@@ -446,21 +445,6 @@
                 if (e.key === 'Enter' && !submitBtn.disabled) {
                     submitBtn.click();
                 }
-            });
-        }
-
-        // Close tab event listener with fallback
-        const closeBtn = document.getElementById('close-btn');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                window.close();
-                setTimeout(() => {
-                    closeBtn.textContent = "Please close tab manually";
-                    closeBtn.style.background = "#27272a";
-                    closeBtn.style.border = "1px solid var(--border)";
-                    closeBtn.style.boxShadow = "none";
-                    closeBtn.style.cursor = "default";
-                }, 300);
             });
         }
     </script>
