@@ -332,7 +332,7 @@
         <h1>Success!</h1>
         <p class="subtitle">Hello <strong id="success-user-name" style="color:#fff;">User</strong>, you have successfully authenticated your Google account. CloudStream TV has been linked.</p>
         <div class="status-badge">✓ Connected to TV</div>
-        <button class="btn btn-success" onclick="window.close()">Close this Tab</button>
+        <button id="close-btn" class="btn btn-success">Close this Tab</button>
     </div>
 
     <!-- 3. Error Status Card -->
@@ -419,6 +419,21 @@
                 if (e.key === 'Enter' && !submitBtn.disabled) {
                     submitBtn.click();
                 }
+            });
+        }
+
+        // Close tab event listener with fallback
+        const closeBtn = document.getElementById('close-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                window.close();
+                setTimeout(() => {
+                    closeBtn.textContent = "Please close tab manually";
+                    closeBtn.style.background = "#27272a";
+                    closeBtn.style.border = "1px solid var(--border)";
+                    closeBtn.style.boxShadow = "none";
+                    closeBtn.style.cursor = "default";
+                }, 300);
             });
         }
     </script>
