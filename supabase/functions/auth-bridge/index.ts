@@ -74,8 +74,9 @@ serve(async (req) => {
       const useOpt2 = session.opt === '2';
       const clientId = (useOpt2 ? Deno.env.get('GOOGLE_CLIENT_ID_2') : Deno.env.get('GOOGLE_CLIENT_ID')) || (useOpt2 ? DEFAULT_CLIENT_ID_2 : DEFAULT_CLIENT_ID);
       
-      // Dynamically resolve redirect URI from the request host
-      const redirectUri = `${url.protocol}//${url.host}/functions/v1/auth-bridge/callback`;
+      // Dynamically resolve redirect URI from the request host (force https unless on localhost)
+      const protocol = url.host.startsWith('localhost') || url.host.startsWith('127.0.0.1') ? 'http:' : 'https:';
+      const redirectUri = `${protocol}//${url.host}/functions/v1/auth-bridge/callback`;
 
       const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${encodeURIComponent(clientId)}&` +
@@ -111,7 +112,8 @@ serve(async (req) => {
       const useOpt2 = session.opt === '2';
       const clientId = (useOpt2 ? Deno.env.get('GOOGLE_CLIENT_ID_2') : Deno.env.get('GOOGLE_CLIENT_ID')) || (useOpt2 ? DEFAULT_CLIENT_ID_2 : DEFAULT_CLIENT_ID);
       const clientSecret = (useOpt2 ? Deno.env.get('GOOGLE_CLIENT_SECRET_2') : Deno.env.get('GOOGLE_CLIENT_SECRET')) || (useOpt2 ? DEFAULT_CLIENT_SECRET_2 : DEFAULT_CLIENT_SECRET);
-      const redirectUri = `${url.protocol}//${url.host}/functions/v1/auth-bridge/callback`;
+      const protocol = url.host.startsWith('localhost') || url.host.startsWith('127.0.0.1') ? 'http:' : 'https:';
+      const redirectUri = `${protocol}//${url.host}/functions/v1/auth-bridge/callback`;
 
       // Exchange authorization code for tokens
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
