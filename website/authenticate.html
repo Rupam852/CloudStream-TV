@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activate CloudStream TV</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #09090b;
+            --card-bg: rgba(255, 255, 255, 0.02);
+            --border: rgba(255, 255, 255, 0.08);
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-glow: rgba(99, 102, 241, 0.25);
+            --text: #f4f4f5;
+            --text-muted: #a1a1aa;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            font-family: 'Outfit', sans-serif;
+            color: var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Ambient glowing backgrounds */
+        body::before {
+            content: '';
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .container {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(20px);
+            padding: 40px 30px;
+            border-radius: 24px;
+            width: 90%;
+            max-width: 420px;
+            text-align: center;
+            z-index: 1;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+            transform: translateY(20px);
+            opacity: 0;
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes slideUp {
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .logo-wrapper {
+            width: 70px;
+            height: 70px;
+            margin: 0 auto 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .logo-img {
+            width: 44px;
+            height: 44px;
+        }
+
+        h1 {
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 15px;
+            line-height: 1.5;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 24px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .code-input {
+            width: 100%;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1.5px solid var(--border);
+            border-radius: 14px;
+            color: #fff;
+            font-size: 24px;
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+        }
+
+        .code-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 12px var(--primary-glow);
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .btn {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            padding: 16px;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px var(--primary-glow);
+        }
+
+        .btn:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        /* Error state styling */
+        .error-message {
+            color: #ef4444;
+            font-size: 14px;
+            margin-top: 8px;
+            display: none;
+            text-align: center;
+        }
+
+        /* Spinner for loading */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            display: none;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="logo-wrapper">
+            <img src="logo.png" alt="CloudStream TV Logo" class="logo-img">
+        </div>
+        <h1>Connect to TV</h1>
+        <p class="subtitle">Enter the 6-character session code shown on your Android TV screen to link your Google Drive.</p>
+        
+        <div class="input-group">
+            <label for="session-code">Session Code</label>
+            <input type="text" id="session-code" class="code-input" maxlength="6" autocomplete="off" placeholder="XXXXXX" autofocus>
+            <div id="error-box" class="error-message">Please enter a valid 6-character code.</div>
+        </div>
+
+        <button id="submit-btn" class="btn" disabled>
+            <div id="btn-spinner" class="spinner"></div>
+            <span id="btn-text">Sign In with Google</span>
+        </button>
+    </div>
+
+    <script>
+        const codeInput = document.getElementById('session-code');
+        const submitBtn = document.getElementById('submit-btn');
+        const errorBox = document.getElementById('error-box');
+        const btnSpinner = document.getElementById('btn-spinner');
+        const btnText = document.getElementById('btn-text');
+
+        // Input validation & formatting
+        codeInput.addEventListener('input', (e) => {
+            let val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+            e.target.value = val;
+            
+            if (val.length === 6) {
+                submitBtn.disabled = false;
+                errorBox.style.display = 'none';
+            } else {
+                submitBtn.disabled = true;
+            }
+        });
+
+        // Submit action
+        submitBtn.addEventListener('click', () => {
+            const code = codeInput.value.trim().toUpperCase();
+            if (code.length !== 6) {
+                errorBox.style.display = 'block';
+                return;
+            }
+
+            // Show loading state
+            submitBtn.disabled = true;
+            codeInput.disabled = true;
+            btnSpinner.style.display = 'block';
+            btnText.textContent = 'Connecting...';
+
+            // Redirect to Supabase login endpoint
+            const backendUrl = `https://tiqebjoqnbaqchljigqz.supabase.co/functions/v1/auth-bridge/api/login?session=${code}`;
+            window.location.href = backendUrl;
+        });
+
+        // Allow Enter key submission
+        codeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !submitBtn.disabled) {
+                submitBtn.click();
+            }
+        });
+    </script>
+</body>
+</html>

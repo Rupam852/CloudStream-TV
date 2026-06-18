@@ -1190,7 +1190,7 @@ fun GoogleLoginOverlay(
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                                 )
                                 Text(
-                                    text = if (verificationUrl.contains("onrender.com")) "cloudstream-tv.onrender.com" else verificationUrl.ifBlank { "google.com/device" },
+                                    text = "cloudstream-tv.vercel.app/authenticate",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
