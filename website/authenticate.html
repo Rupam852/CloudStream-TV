@@ -13,6 +13,10 @@
             --primary: #6366f1;
             --primary-hover: #4f46e5;
             --primary-glow: rgba(99, 102, 241, 0.25);
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.15);
+            --danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.15);
             --text: #f4f4f5;
             --text-muted: #a1a1aa;
         }
@@ -47,9 +51,18 @@
             transform: translate(-50%, -50%);
             z-index: 0;
             pointer-events: none;
+            transition: all 0.5s ease;
         }
 
-        .container {
+        /* Dynamic glow based on status */
+        body.success-glow::before {
+            background: radial-gradient(circle, var(--success-glow) 0%, transparent 70%);
+        }
+        body.error-glow::before {
+            background: radial-gradient(circle, var(--danger-glow) 0%, transparent 70%);
+        }
+
+        .card {
             background: var(--card-bg);
             border: 1px solid var(--border);
             backdrop-filter: blur(20px);
@@ -63,6 +76,7 @@
             transform: translateY(20px);
             opacity: 0;
             animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            display: none; /* Controlled by JS */
         }
 
         @keyframes slideUp {
@@ -156,6 +170,7 @@
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 8px 20px var(--primary-glow);
+            text-decoration: none;
         }
 
         .btn:hover {
@@ -176,7 +191,91 @@
             cursor: not-allowed;
         }
 
-        /* Error state styling */
+        /* Success & Error specific styling */
+        .icon-wrapper-status {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 24px;
+            animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .success-wrapper {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1.5px solid var(--success);
+            box-shadow: 0 0 20px var(--success-glow);
+        }
+
+        .error-wrapper {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1.5px solid var(--danger);
+            box-shadow: 0 0 20px var(--danger-glow);
+        }
+
+        @keyframes scaleIn {
+            from { transform: scale(0.5); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .checkmark {
+            width: 36px;
+            height: 36px;
+            fill: none;
+            stroke: var(--success);
+            stroke-width: 3;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+            animation: drawCheck 0.8s 0.3s ease-out forwards;
+        }
+
+        .cross {
+            width: 36px;
+            height: 36px;
+            stroke: var(--danger);
+            stroke-width: 3;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        @keyframes drawCheck {
+            to { stroke-dashoffset: 0; }
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 24px;
+        }
+
+        .btn-success {
+            background: var(--success);
+            box-shadow: 0 8px 20px var(--success-glow);
+        }
+        .btn-success:hover {
+            background: #059669;
+            box-shadow: 0 12px 24px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            box-shadow: 0 8px 20px var(--danger-glow);
+        }
+        .btn-danger:hover {
+            background: #dc2626;
+            box-shadow: 0 12px 24px rgba(239, 68, 68, 0.4);
+        }
+
         .error-message {
             color: #ef4444;
             font-size: 14px;
@@ -185,7 +284,6 @@
             text-align: center;
         }
 
-        /* Spinner for loading */
         .spinner {
             width: 20px;
             height: 20px;
@@ -204,7 +302,8 @@
 </head>
 <body>
 
-    <div class="container">
+    <!-- 1. Activation Input Card -->
+    <div id="activation-card" class="card">
         <div class="logo-wrapper">
             <img src="logo.png" alt="CloudStream TV Logo" class="logo-img">
         </div>
@@ -223,51 +322,105 @@
         </button>
     </div>
 
+    <!-- 2. Success Status Card -->
+    <div id="success-card" class="card">
+        <div class="icon-wrapper-status success-wrapper">
+            <svg class="checkmark" viewBox="0 0 24 24">
+                <path d="M20 6L9 17L4 12" />
+            </svg>
+        </div>
+        <h1>Success!</h1>
+        <p class="subtitle">Hello <strong id="success-user-name" style="color:#fff;">User</strong>, you have successfully authenticated your Google account. CloudStream TV has been linked.</p>
+        <div class="status-badge">✓ Connected to TV</div>
+        <button class="btn btn-success" onclick="window.close()">Close this Tab</button>
+    </div>
+
+    <!-- 3. Error Status Card -->
+    <div id="error-card" class="card">
+        <div class="icon-wrapper-status error-wrapper">
+            <svg class="cross" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" />
+            </svg>
+        </div>
+        <h1>Authentication Error</h1>
+        <p class="subtitle" id="error-message-text">This session code is invalid or has expired. Please restart the login screen on your TV.</p>
+        <div class="status-badge">Connection Expired</div>
+        <a href="/authenticate" class="btn btn-danger">Try Again</a>
+    </div>
+
     <script>
+        // Check for URL status parameters
+        const params = new URLSearchParams(window.location.search);
+        const status = params.get('status');
+        const name = params.get('name');
+        const message = params.get('message');
+
+        const activationCard = document.getElementById('activation-card');
+        const successCard = document.getElementById('success-card');
+        const errorCard = document.getElementById('error-card');
+
+        // Route to the appropriate screen
+        if (status === 'success') {
+            document.body.classList.add('success-glow');
+            activationCard.style.display = 'none';
+            successCard.style.display = 'block';
+            if (name) {
+                document.getElementById('success-user-name').textContent = decodeURIComponent(name);
+            }
+        } else if (status === 'error') {
+            document.body.classList.add('error-glow');
+            activationCard.style.display = 'none';
+            errorCard.style.display = 'block';
+            if (message) {
+                document.getElementById('error-message-text').textContent = decodeURIComponent(message);
+            }
+        } else {
+            activationCard.style.display = 'block';
+        }
+
+        // Input handler for code entry
         const codeInput = document.getElementById('session-code');
         const submitBtn = document.getElementById('submit-btn');
         const errorBox = document.getElementById('error-box');
         const btnSpinner = document.getElementById('btn-spinner');
         const btnText = document.getElementById('btn-text');
 
-        // Input validation & formatting
-        codeInput.addEventListener('input', (e) => {
-            let val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-            e.target.value = val;
-            
-            if (val.length === 6) {
-                submitBtn.disabled = false;
-                errorBox.style.display = 'none';
-            } else {
+        if (codeInput) {
+            codeInput.addEventListener('input', (e) => {
+                let val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                e.target.value = val;
+                
+                if (val.length === 6) {
+                    submitBtn.disabled = false;
+                    errorBox.style.display = 'none';
+                } else {
+                    submitBtn.disabled = true;
+                }
+            });
+
+            submitBtn.addEventListener('click', () => {
+                const code = codeInput.value.trim().toUpperCase();
+                if (code.length !== 6) {
+                    errorBox.style.display = 'block';
+                    return;
+                }
+
                 submitBtn.disabled = true;
-            }
-        });
+                codeInput.disabled = true;
+                btnSpinner.style.display = 'block';
+                btnText.textContent = 'Connecting...';
 
-        // Submit action
-        submitBtn.addEventListener('click', () => {
-            const code = codeInput.value.trim().toUpperCase();
-            if (code.length !== 6) {
-                errorBox.style.display = 'block';
-                return;
-            }
+                // Redirect to Supabase login endpoint
+                const backendUrl = `https://tiqebjoqnbaqchljigqz.supabase.co/functions/v1/auth-bridge/api/login?session=${code}`;
+                window.location.href = backendUrl;
+            });
 
-            // Show loading state
-            submitBtn.disabled = true;
-            codeInput.disabled = true;
-            btnSpinner.style.display = 'block';
-            btnText.textContent = 'Connecting...';
-
-            // Redirect to Supabase login endpoint
-            const backendUrl = `https://tiqebjoqnbaqchljigqz.supabase.co/functions/v1/auth-bridge/api/login?session=${code}`;
-            window.location.href = backendUrl;
-        });
-
-        // Allow Enter key submission
-        codeInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !submitBtn.disabled) {
-                submitBtn.click();
-            }
-        });
+            codeInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !submitBtn.disabled) {
+                    submitBtn.click();
+                }
+            });
+        }
     </script>
 </body>
 </html>

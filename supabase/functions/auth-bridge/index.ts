@@ -58,12 +58,7 @@ serve(async (req) => {
     if (path === '/login' || path === '/api/login') {
       const sessionId = url.searchParams.get('session')?.trim().toUpperCase();
       if (!sessionId) {
-        const headers = new Headers(corsHeaders);
-        headers.set('Content-Type', 'text/html; charset=utf-8');
-        return new Response(getErrorHtml('Invalid Request', 'Missing session parameter in the URL. Please scan the QR code from your TV app.'), {
-          status: 400,
-          headers
-        });
+        return Response.redirect('https://cloudstream-tv.vercel.app/authenticate?status=error&message=Missing%20session%20parameter%20in%20the%20URL.%20Please%20scan%20the%20QR%20code%20or%20enter%20the%20code%20manually.', 302);
       }
 
       const { data: session, error } = await supabase
@@ -73,12 +68,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (error || !session) {
-        const headers = new Headers(corsHeaders);
-        headers.set('Content-Type', 'text/html; charset=utf-8');
-        return new Response(getErrorHtml('Session Expired', 'This login session is invalid or has expired. Please close the login screen on your TV and open it again to generate a new session.'), {
-          status: 400,
-          headers
-        });
+        return Response.redirect('https://cloudstream-tv.vercel.app/authenticate?status=error&message=This%20login%20session%20is%20invalid%20or%20has%20expired.%20Please%20close%20the%20login%20screen%20on%20your%20TV%20and%20open%20it%20again.', 302);
       }
 
       const useOpt2 = session.opt === '2';
@@ -106,12 +96,7 @@ serve(async (req) => {
       const sessionId = url.searchParams.get('state')?.trim().toUpperCase();
 
       if (!code || !sessionId) {
-        const headers = new Headers(corsHeaders);
-        headers.set('Content-Type', 'text/html; charset=utf-8');
-        return new Response(getErrorHtml('Invalid Request', 'Missing authorization code or state from Google. Please try logging in again.'), {
-          status: 400,
-          headers
-        });
+        return Response.redirect('https://cloudstream-tv.vercel.app/authenticate?status=error&message=Missing%20authorization%20code%20or%20state%20from%20Google.%20Please%20try%20logging%20in%20again.', 302);
       }
 
       const { data: session, error } = await supabase
@@ -121,12 +106,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (error || !session) {
-        const headers = new Headers(corsHeaders);
-        headers.set('Content-Type', 'text/html; charset=utf-8');
-        return new Response(getErrorHtml('Session Expired', 'This login session has expired or is invalid. Please close the login screen on your TV and open it again.'), {
-          status: 400,
-          headers
-        });
+        return Response.redirect('https://cloudstream-tv.vercel.app/authenticate?status=error&message=This%20login%20session%20has%20expired%20or%20is%20invalid.%20Please%20close%20the%20login%20screen%20on%20your%20TV%20and%20open%20it%20again.', 302);
       }
 
       const useOpt2 = session.opt === '2';
@@ -206,12 +186,8 @@ serve(async (req) => {
         }
       }
 
-      const headers = new Headers(corsHeaders);
-      headers.set('Content-Type', 'text/html; charset=utf-8');
-      return new Response(getSuccessHtml(name), {
-        status: 200,
-        headers
-      });
+      const encodedName = encodeURIComponent(name || 'User');
+      return Response.redirect(`https://cloudstream-tv.vercel.app/authenticate?status=success&name=${encodedName}`, 302);
     }
 
     // 4. Polling endpoint for Android TV client
@@ -371,329 +347,4 @@ async function sendWelcomeEmail(smtpUser: string, smtpPass: string, recipientEma
   } catch (err) {
     console.error('Exception in sendWelcomeEmail via Nodemailer:', err);
   }
-}
-
-function getSuccessHtml(name: string | null): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Authentication Successful</title>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #09090b;
-      --card-bg: rgba(255, 255, 255, 0.03);
-      --border: rgba(255, 255, 255, 0.08);
-      --success: #10b981;
-      --success-glow: rgba(16, 185, 129, 0.15);
-      --text: #f4f4f5;
-      --text-muted: #a1a1aa;
-    }
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    body {
-      background-color: var(--bg);
-      font-family: 'Outfit', sans-serif;
-      color: var(--text);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      overflow: hidden;
-      position: relative;
-    }
-    body::before {
-      content: '';
-      position: absolute;
-      width: 400px;
-      height: 400px;
-      background: radial-gradient(circle, var(--success-glow) 0%, transparent 70%);
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 0;
-      pointer-events: none;
-    }
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      backdrop-filter: blur(16px);
-      padding: 40px 30px;
-      border-radius: 24px;
-      width: 90%;
-      max-width: 420px;
-      text-align: center;
-      z-index: 1;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-      transform: translateY(20px);
-      animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    @keyframes slideUp {
-      to {
-        transform: translateY(0);
-        opacity: 1;
-      }
-    }
-    .icon-wrapper {
-      width: 80px;
-      height: 80px;
-      background: rgba(16, 185, 129, 0.1);
-      border: 1.5px solid var(--success);
-      border-radius: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin: 0 auto 24px;
-      box-shadow: 0 0 20px var(--success-glow);
-      animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-    }
-    @keyframes scaleIn {
-      from {
-        transform: scale(0.5);
-        opacity: 0;
-      }
-      to {
-        transform: scale(1);
-        opacity: 1;
-      }
-    }
-    .checkmark {
-      width: 36px;
-      height: 36px;
-      fill: none;
-      stroke: var(--success);
-      stroke-width: 3;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      stroke-dasharray: 100;
-      stroke-dashoffset: 100;
-      animation: drawCheck 0.8s 0.3s ease-out forwards;
-    }
-    @keyframes drawCheck {
-      to {
-        stroke-dashoffset: 0;
-      }
-    }
-    h1 {
-      font-size: 24px;
-      font-weight: 700;
-      margin-bottom: 12px;
-      letter-spacing: -0.5px;
-    }
-    p {
-      color: var(--text-muted);
-      font-size: 15px;
-      line-height: 1.6;
-      margin-bottom: 24px;
-    }
-    .status-badge {
-      display: inline-block;
-      padding: 6px 16px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      border-radius: 100px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 24px;
-    }
-    .btn {
-      display: block;
-      width: 100%;
-      padding: 14px;
-      background: var(--success);
-      color: #fff;
-      border: none;
-      border-radius: 12px;
-      font-size: 15px;
-      font-weight: 600;
-      text-decoration: none;
-      transition: all 0.3s ease;
-      cursor: pointer;
-      box-shadow: 0 4px 12px var(--success-glow);
-    }
-    .btn:hover {
-      background: #059669;
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="icon-wrapper">
-      <svg class="checkmark" viewBox="0 0 24 24">
-        <path d="M20 6L9 17L4 12" />
-      </svg>
-    </div>
-    <h1>Authentication Successful!</h1>
-    <p>Hello <strong>${name || 'User'}</strong>, you have successfully signed in with your Google account. CloudStream TV has been authorized.</p>
-    <div class="status-badge">✓ Connected to TV</div>
-    <button class="btn" onclick="window.close()">Close this Tab</button>
-  </div>
-</body>
-</html>`;
-}
-
-function getErrorHtml(title: string, message: string): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #09090b;
-      --card-bg: rgba(255, 255, 255, 0.03);
-      --border: rgba(255, 255, 255, 0.08);
-      --danger: #ef4444;
-      --danger-glow: rgba(239, 68, 68, 0.15);
-      --text: #f4f4f5;
-      --text-muted: #a1a1aa;
-    }
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    body {
-      background-color: var(--bg);
-      font-family: 'Outfit', sans-serif;
-      color: var(--text);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      overflow: hidden;
-      position: relative;
-    }
-    body::before {
-      content: '';
-      position: absolute;
-      width: 400px;
-      height: 400px;
-      background: radial-gradient(circle, var(--danger-glow) 0%, transparent 70%);
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 0;
-      pointer-events: none;
-    }
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      backdrop-filter: blur(16px);
-      padding: 40px 30px;
-      border-radius: 24px;
-      width: 90%;
-      max-width: 420px;
-      text-align: center;
-      z-index: 1;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-      transform: translateY(20px);
-      animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    @keyframes slideUp {
-      to {
-        transform: translateY(0);
-        opacity: 1;
-      }
-    }
-    .icon-wrapper {
-      width: 80px;
-      height: 80px;
-      background: rgba(239, 68, 68, 0.1);
-      border: 1.5px solid var(--danger);
-      border-radius: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin: 0 auto 24px;
-      box-shadow: 0 0 20px var(--danger-glow);
-      animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-    }
-    @keyframes scaleIn {
-      from {
-        transform: scale(0.5);
-        opacity: 0;
-      }
-      to {
-        transform: scale(1);
-        opacity: 1;
-      }
-    }
-    .cross {
-      width: 36px;
-      height: 36px;
-      stroke: var(--danger);
-      stroke-width: 3;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-    h1 {
-      font-size: 24px;
-      font-weight: 700;
-      margin-bottom: 12px;
-      letter-spacing: -0.5px;
-    }
-    p {
-      color: var(--text-muted);
-      font-size: 15px;
-      line-height: 1.6;
-      margin-bottom: 24px;
-    }
-    .status-badge {
-      display: inline-block;
-      padding: 6px 16px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      border-radius: 100px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 24px;
-    }
-    .btn {
-      display: block;
-      width: 100%;
-      padding: 14px;
-      background: var(--danger);
-      color: #fff;
-      border: none;
-      border-radius: 12px;
-      font-size: 15px;
-      font-weight: 600;
-      text-decoration: none;
-      transition: all 0.3s ease;
-      cursor: pointer;
-      box-shadow: 0 4px 12px var(--danger-glow);
-    }
-    .btn:hover {
-      background: #dc2626;
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3);
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="icon-wrapper">
-      <svg class="cross" viewBox="0 0 24 24" fill="none">
-        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor"/>
-      </svg>
-    </div>
-    <h1>${title}</h1>
-    <p>${message}</p>
-    <div class="status-badge">Error</div>
-    <button class="btn" onclick="window.close()">Close this Tab</button>
-  </div>
-</body>
-</html>`;
 }
