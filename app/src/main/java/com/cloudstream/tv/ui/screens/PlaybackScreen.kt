@@ -39,9 +39,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -77,7 +79,9 @@ import com.cloudstream.tv.ui.components.TVFocusableItem
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.activity.compose.BackHandler
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @OptIn(UnstableApi::class)
@@ -222,15 +226,22 @@ fun PlaybackScreen(
     var isBuffering by remember { mutableStateOf(false) }
     var resolvedUrl by remember { mutableStateOf<String?>(null) }
     var oauthToken by remember { mutableStateOf<String?>(null) }
-    
+
     var controlsVisible by remember { mutableStateOf(true) }
     var userActivityTrigger by remember { mutableStateOf(0L) }
-    
+
     var resizeMode by remember { mutableStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
     var playbackSpeed by remember { mutableStateOf(1.0f) }
 
     val playButtonFocusRequester = remember { FocusRequester() }
     val timelineFocusRequester = remember { FocusRequester() }
+
+    // Coroutine scope for debounced seeks
+    val coroutineScope = rememberCoroutineScope()
+    var seekDebounceJob by remember { mutableStateOf<Job?>(null) }
+
+    // Retry counter for auto-recovery on player error (max 2 retries)
+    var playerErrorRetryCount by remember { mutableIntStateOf(0) }
 
     // Resolve URL on change
     LaunchedEffect(activeFile) {
@@ -336,9 +347,35 @@ fun PlaybackScreen(
             }
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                Log.e("PlaybackScreen", "Player error: ", error)
+                Log.e("PlaybackScreen", "Player error (retry=$playerErrorRetryCount): ", error)
                 isBuffering = false
-                showToast("Playback error: ${error.localizedMessage ?: "Unknown error"}", Icons.Default.Pause)
+
+                // Bug 1 Fix: Auto-recover from network/seek-overflow errors instead of
+                // just showing a toast and leaving the player in a broken state.
+                // We retry up to 2 times by re-preparing the player and seeking back
+                // to the last known position. After 2 failures we surface the error.
+                val isRecoverable = error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
+                    || error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+                    || error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
+                    || error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW
+                    || error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+
+                if (isRecoverable && playerErrorRetryCount < 2) {
+                    playerErrorRetryCount++
+                    val resumePos = currentPosition.coerceAtLeast(0L)
+                    Log.w("PlaybackScreen", "Recoverable error — attempting retry $playerErrorRetryCount at position $resumePos ms")
+                    showToast("Reconnecting... ($playerErrorRetryCount/2)", Icons.Default.PlayArrow)
+                    try {
+                        exoPlayer.prepare()
+                        if (resumePos > 0L) exoPlayer.seekTo(resumePos)
+                        exoPlayer.play()
+                    } catch (e: Exception) {
+                        Log.e("PlaybackScreen", "Recovery attempt $playerErrorRetryCount failed", e)
+                    }
+                } else {
+                    playerErrorRetryCount = 0
+                    showToast("Playback error: ${error.localizedMessage ?: "Unknown error"}", Icons.Default.Pause)
+                }
             }
         }
         exoPlayer.addListener(listener)
@@ -393,11 +430,19 @@ fun PlaybackScreen(
         }
     }
 
-    // Focus timeline on overlay reveal
+    // Bug 2 Fix: Focus Play/Pause button (not seekbar) after controls appear.
+    // Delay must be >= AnimatedVisibility fade-in duration (400ms) so the composable
+    // is fully attached before requestFocus() is called — otherwise focus silently
+    // fails and the next key events get swallowed or trigger buffering.
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) {
-            delay(100)
-            timelineFocusRequester.requestFocus()
+            delay(450)
+            try {
+                playButtonFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                // Composable may not be attached yet; safe to ignore
+                Log.w("PlaybackScreen", "Focus request failed (controls not yet attached): ${e.message}")
+            }
         }
     }
 
@@ -417,18 +462,33 @@ fun PlaybackScreen(
         }
     }
 
+    // Bug 1 Fix: Debounced seek — rapid key presses cancel the previous pending seek
+    // and schedule a new one 300ms later. This prevents ExoPlayer from being flooded
+    // with overlapping seek requests which causes SOURCE_ERROR / stream failure.
     fun seekForward() {
         showControls()
-        exoPlayer.seekTo((exoPlayer.currentPosition + 10000).coerceAtMost(duration))
-        currentPosition = exoPlayer.currentPosition
         showToast("Forward +10s", Icons.Default.FastForward)
+        // Optimistically update UI position immediately
+        currentPosition = (currentPosition + 10000L).coerceAtMost(duration)
+        seekDebounceJob?.cancel()
+        seekDebounceJob = coroutineScope.launch {
+            delay(300)
+            exoPlayer.seekTo(currentPosition)
+            playerErrorRetryCount = 0 // reset retry counter on intentional seek
+        }
     }
 
     fun seekRewind() {
         showControls()
-        exoPlayer.seekTo((exoPlayer.currentPosition - 10000).coerceAtLeast(0))
-        currentPosition = exoPlayer.currentPosition
         showToast("Rewind -10s", Icons.Default.FastRewind)
+        // Optimistically update UI position immediately
+        currentPosition = (currentPosition - 10000L).coerceAtLeast(0L)
+        seekDebounceJob?.cancel()
+        seekDebounceJob = coroutineScope.launch {
+            delay(300)
+            exoPlayer.seekTo(currentPosition)
+            playerErrorRetryCount = 0 // reset retry counter on intentional seek
+        }
     }
 
     fun skipNext() {
@@ -938,9 +998,11 @@ private fun PlaybackTimeline(
             .fillMaxWidth()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
-                if (focusState.isFocused) {
-                    tempSeekPosition = currentPosition
-                } else {
+                // Bug 3 Fix: Do NOT set tempSeekPosition when focus arrives.
+                // Previously this caused an accidental seek 400ms after every
+                // time the seekbar gained focus (e.g. user just wanted to see controls).
+                // tempSeekPosition is now only set by explicit DPAD_LEFT/RIGHT presses.
+                if (!focusState.isFocused) {
                     tempSeekPosition = null
                 }
             }
@@ -948,13 +1010,15 @@ private fun PlaybackTimeline(
                 if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
                     when (keyEvent.nativeKeyEvent.keyCode) {
                         KeyEvent.KEYCODE_DPAD_LEFT -> {
-                            val step = (duration / 100).coerceIn(5000L, 30000L)
+                            // Bug 3 Fix: Fixed 10s step — consistent & predictable.
+                            // Previous dynamic step (duration/100) was confusing.
+                            val step = 10_000L
                             val currentTemp = tempSeekPosition ?: currentPosition
                             tempSeekPosition = (currentTemp - step).coerceAtLeast(0L)
                             true
                         }
                         KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            val step = (duration / 100).coerceIn(5000L, 30000L)
+                            val step = 10_000L
                             val currentTemp = tempSeekPosition ?: currentPosition
                             tempSeekPosition = (currentTemp + step).coerceAtMost(duration)
                             true
