@@ -80,6 +80,9 @@ dependencies {
     // Media3 ExoPlayer
     implementation("androidx.media3:media3-exoplayer:1.2.1")
     implementation("androidx.media3:media3-ui:1.2.1")
+    // OkHttp DataSource: enables ExoPlayer to use OkHttpClient with Authenticator
+    // for automatic OAuth token refresh on 401 without interrupting video playback
+    implementation("androidx.media3:media3-datasource-okhttp:1.2.1")
 
     // Image loading
     implementation("io.coil-kt:coil-compose:2.6.0")

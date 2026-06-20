@@ -76,7 +76,10 @@ import com.cloudstream.tv.data.DriveFile
 import com.cloudstream.tv.data.DriveRepository
 import com.cloudstream.tv.network.GoogleDriveClient
 import com.cloudstream.tv.ui.components.TVFocusableItem
-import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.runBlocking
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.Job
@@ -275,25 +278,56 @@ fun PlaybackScreen(
     LaunchedEffect(resolvedUrl, oauthToken) {
         val url = resolvedUrl ?: return@LaunchedEffect
         val mediaItem = MediaItem.fromUri(url)
-        
-        // Build a robust HTTP DataSource Factory that sets a standard browser User-Agent
-        // and enables redirects, which ensures Google Drive streams accept Range headers and are seekable.
-        val dataSourceFactory = DefaultHttpDataSource.Factory().apply {
+        val token = oauthToken
+
+        // TOKEN EXPIRY FIX — Defense 2: OkHttp Authenticator
+        // When ExoPlayer sends a chunk request with an expired token, Google returns 401.
+        // The OkHttp Authenticator intercepts this 401 BEFORE ExoPlayer even sees it,
+        // silently refreshes the token via repository.getAccessToken(), and retries
+        // the exact same request with the new token — completely transparent to the player.
+        // This means video NEVER stops for a token expiry, even for 3GB+ 3-hour movies.
+        val tokenRefreshingClient = OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .authenticator { _, response ->
+                // Called automatically by OkHttp when it receives a 401 Unauthorized.
+                // Guard against infinite retry loop (max 1 retry per request).
+                if (response.request.header("X-Token-Refreshed") != null) {
+                    Log.e("PlaybackScreen", "Token refresh failed — giving up on this request")
+                    return@authenticator null
+                }
+                Log.w("PlaybackScreen", "Got 401 during streaming — refreshing OAuth token")
+                // runBlocking is safe here: OkHttp Authenticator always runs on an IO thread,
+                // never on the main thread.
+                val newToken = runBlocking { repository.getAccessToken() }
+                if (newToken != null) {
+                    Log.i("PlaybackScreen", "Token refreshed successfully — retrying chunk request")
+                    response.request.newBuilder()
+                        .header("Authorization", "Bearer $newToken")
+                        .header("X-Token-Refreshed", "true") // prevent infinite retry
+                        .build()
+                } else {
+                    Log.e("PlaybackScreen", "Token refresh returned null — cannot retry")
+                    null
+                }
+            }
+            .build()
+
+        val dataSourceFactory = OkHttpDataSource.Factory(tokenRefreshingClient).apply {
             setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-            setAllowCrossProtocolRedirects(true)
-            val token = oauthToken
             if (token != null && url.contains("googleapis.com")) {
                 setDefaultRequestProperties(mapOf("Authorization" to "Bearer $token"))
             }
         }
-        
+
         val extractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory().apply {
             setConstantBitrateSeekingEnabled(true)
         }
 
         val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory, extractorsFactory)
             .createMediaSource(mediaItem)
-        
+
         exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
 
@@ -306,6 +340,62 @@ fun PlaybackScreen(
         }
 
         exoPlayer.play()
+    }
+
+    // TOKEN EXPIRY FIX — Defense 1: Proactive Token Watchdog
+    // Runs silently in background every 45 minutes during playback.
+    // Google OAuth tokens expire after 1 hour. By refreshing at 45 min, the token
+    // is ALWAYS fresh — the Authenticator (Defense 2) serves as the last safety net
+    // in case this misses (e.g. app was backgrounded and resumed).
+    LaunchedEffect(resolvedUrl) {
+        if (resolvedUrl == null || oauthToken == null) return@LaunchedEffect
+        // Wait 45 minutes before first proactive refresh
+        delay(45 * 60 * 1000L)
+        while (true) {
+            Log.i("PlaybackScreen", "Token watchdog: proactively refreshing OAuth token")
+            val currentPos = exoPlayer.currentPosition
+            val wasPlaying = exoPlayer.playWhenReady
+            val newToken = repository.getAccessToken()
+            if (newToken != null && newToken != oauthToken) {
+                // Token was refreshed — rebuild media source at current position
+                Log.i("PlaybackScreen", "Token changed — rebuilding media source at $currentPos ms")
+                val url = resolvedUrl ?: break
+                val mediaItem = MediaItem.fromUri(url)
+                val refreshedClient = OkHttpClient.Builder()
+                    .connectTimeout(15, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .writeTimeout(15, TimeUnit.SECONDS)
+                    .authenticator { _, response ->
+                        if (response.request.header("X-Token-Refreshed") != null) return@authenticator null
+                        val refreshed = runBlocking { repository.getAccessToken() }
+                        refreshed?.let {
+                            response.request.newBuilder()
+                                .header("Authorization", "Bearer $it")
+                                .header("X-Token-Refreshed", "true")
+                                .build()
+                        }
+                    }
+                    .build()
+                val newFactory = OkHttpDataSource.Factory(refreshedClient).apply {
+                    setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    if (url.contains("googleapis.com")) {
+                        setDefaultRequestProperties(mapOf("Authorization" to "Bearer $newToken"))
+                    }
+                }
+                val newExtractors = androidx.media3.extractor.DefaultExtractorsFactory()
+                    .apply { setConstantBitrateSeekingEnabled(true) }
+                val newSource = ProgressiveMediaSource.Factory(newFactory, newExtractors)
+                    .createMediaSource(mediaItem)
+                exoPlayer.setMediaSource(newSource, currentPos)
+                exoPlayer.prepare()
+                if (wasPlaying) exoPlayer.play()
+                oauthToken = newToken
+            } else {
+                Log.i("PlaybackScreen", "Token watchdog: token still valid, no rebuild needed")
+            }
+            // Check again in 45 minutes
+            delay(45 * 60 * 1000L)
+        }
     }
 
     // Listen to player state changes
