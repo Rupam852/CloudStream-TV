@@ -95,6 +95,10 @@ fun TVFocusableItem(
 
     val coroutineScope = rememberCoroutineScope()
     var longClickJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    // T3 Fix: Track whether onLongClick actually fired.
+    // Without this flag, ACTION_UP after a long-press would also call onClick()
+    // because longClickJob was still technically "active" when the UP event arrived.
+    var longClickFired by remember { mutableStateOf(false) }
 
     val itemModifier = if (onLongClick != null && enabled) {
         modifier.onPreviewKeyEvent { keyEvent ->
@@ -105,18 +109,23 @@ fun TVFocusableItem(
                 if (action == android.view.KeyEvent.ACTION_DOWN) {
                     if (keyEvent.nativeKeyEvent.repeatCount == 0) {
                         longClickJob?.cancel()
+                        longClickFired = false
                         longClickJob = coroutineScope.launch {
                             kotlinx.coroutines.delay(500)
+                            longClickFired = true
                             onLongClick()
                         }
                     }
                     true
                 } else if (action == android.view.KeyEvent.ACTION_UP) {
-                    val wasActive = longClickJob?.isActive == true
                     longClickJob?.cancel()
-                    if (wasActive) {
+                    // T3 Fix: Only call onClick if long-press did NOT fire.
+                    // Previously used `longClickJob?.isActive` which could be true
+                    // even after onLongClick() ran, causing both to trigger.
+                    if (!longClickFired) {
                         onClick()
                     }
+                    longClickFired = false
                     true
                 } else {
                     false
@@ -365,12 +374,19 @@ fun TVSidebarItem(
 
     val coroutineScope = rememberCoroutineScope()
     var longClickJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    // T3 Fix: Same longClickFired flag as TVFocusableItem to prevent onClick
+    // from also firing when a long-press completes.
+    var longClickFired by remember { mutableStateOf(false) }
 
     val itemModifier = if (onLongSelect != null) {
         modifier
             .fillMaxWidth()
             .height(48.dp)
             .clip(RoundedCornerShape(8.dp))
+            // T1 Fix: .focusable() is required for Android TV D-Pad traversal.
+            // Without it, the TV focus system may skip these items entirely
+            // because clickable() alone does not register as a TV-focusable node.
+            .focusable(interactionSource = interactionSource)
             .onPreviewKeyEvent { keyEvent ->
                 val keyCode = keyEvent.nativeKeyEvent.keyCode
                 val action = keyEvent.nativeKeyEvent.action
@@ -379,18 +395,20 @@ fun TVSidebarItem(
                     if (action == android.view.KeyEvent.ACTION_DOWN) {
                         if (keyEvent.nativeKeyEvent.repeatCount == 0) {
                             longClickJob?.cancel()
+                            longClickFired = false
                             longClickJob = coroutineScope.launch {
                                 kotlinx.coroutines.delay(500)
+                                longClickFired = true
                                 onLongSelect()
                             }
                         }
                         true
                     } else if (action == android.view.KeyEvent.ACTION_UP) {
-                        val wasActive = longClickJob?.isActive == true
                         longClickJob?.cancel()
-                        if (wasActive) {
+                        if (!longClickFired) {
                             onSelect()
                         }
+                        longClickFired = false
                         true
                     } else {
                         false
@@ -409,6 +427,8 @@ fun TVSidebarItem(
             .fillMaxWidth()
             .height(48.dp)
             .clip(RoundedCornerShape(8.dp))
+            // T1 Fix: Also add focusable() to the no-long-click variant
+            .focusable(interactionSource = interactionSource)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,

@@ -46,6 +46,11 @@ val LightOnErrorContainer = Color(0xFF4A1516)
 val NeonCyanGlow = Color(0xFF00F5FF)
 val AccentPurpleGlow = Color(0xFF9F75FF)
 
+private val DarkError = Color(0xFFFF5370)          // Soft neon coral red
+private val DarkErrorContainer = Color(0xFF4A1020)  // Deep dark red container
+private val DarkOnError = Color(0xFF1A0010)
+private val DarkOnErrorContainer = Color(0xFFFFB3C1)
+
 private val DarkTvColorScheme = darkColorScheme(
     primary = DarkPrimary,
     secondary = DarkSecondary,
@@ -54,7 +59,13 @@ private val DarkTvColorScheme = darkColorScheme(
     surfaceVariant = DarkSurfaceVariant,
     onBackground = DarkOnBackground,
     onSurface = DarkOnSurface,
-    onSurfaceVariant = DarkOnSurfaceVariant
+    onSurfaceVariant = DarkOnSurfaceVariant,
+    // Th1 Fix: Dark theme was missing error colors, falling back to Material3 defaults
+    // (bright pure red) which clashed with the PlayStation deep-space aesthetic.
+    error = DarkError,
+    errorContainer = DarkErrorContainer,
+    onError = DarkOnError,
+    onErrorContainer = DarkOnErrorContainer
 )
 
 private val LightTvColorScheme = lightColorScheme(

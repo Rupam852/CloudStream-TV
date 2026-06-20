@@ -13,24 +13,34 @@ import java.io.IOException
 import java.net.URLDecoder
 import java.util.regex.Pattern
 
+import java.util.concurrent.TimeUnit
+
 object GoogleDriveClient {
     private const val TAG = "GoogleDriveClient"
     private val client = OkHttpClient.Builder()
         .followRedirects(true)
         .followSslRedirects(true)
+        // G4 Fix: Explicit timeouts so the app never hangs forever on slow/dead networks.
+        // Without these, OkHttp defaults to no timeout on read — causing infinite freeze.
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
         .build()
 
     fun extractFolderId(url: String): String? {
         val trimmed = url.trim()
-        if (trimmed.length in 28..45 && !trimmed.contains("http") && !trimmed.contains("/")) {
+        // G3 Fix: Google Drive IDs vary in length. Widened from {28,45} to {20,60}
+        // to support newer longer IDs that were previously rejected with false "Could not
+        // extract folder ID" errors.
+        if (trimmed.length in 20..60 && !trimmed.contains("http") && !trimmed.contains("/")) {
             return trimmed
         }
         
         // Match /folders/ID or id=ID
         val patterns = listOf(
-            "folders/([a-zA-Z0-9_-]{28,45})",
-            "id=([a-zA-Z0-9_-]{28,45})",
-            "open\\?id=([a-zA-Z0-9_-]{28,45})"
+            "folders/([a-zA-Z0-9_-]{20,60})",
+            "id=([a-zA-Z0-9_-]{20,60})",
+            "open\\?id=([a-zA-Z0-9_-]{20,60})"
         )
         
         for (patternStr in patterns) {
@@ -48,7 +58,10 @@ object GoogleDriveClient {
             return true
         }
         return try {
-            // Check mimeType first if we are authenticated or have API key
+            // G1 Fix: Previously this function called fetchFolderContents() AFTER the mimeType
+            // check, causing 2 network requests for every folder validation. The mimeType check
+            // already confirms the resource is a valid accessible folder — the extra listing
+            // was redundant and its result was thrown away.
             if (!oauthToken.isNullOrBlank()) {
                 val url = "https://www.googleapis.com/drive/v3/files/$folderId?fields=mimeType"
                 val request = Request.Builder()
@@ -89,8 +102,7 @@ object GoogleDriveClient {
                     }
                 }
             }
-
-            fetchFolderContents(folderId, apiKey, oauthToken)
+            // mimeType check passed — folder is valid and accessible
             true
         } catch (e: Exception) {
             Log.e(TAG, "Validation failed for folder $folderId", e)
@@ -481,7 +493,9 @@ object GoogleDriveClient {
         }
     }
 
-    fun fetchFolderContentsViaOAuth(folderId: String, accessToken: String): List<DriveFile> {
+    // G2 Fix: Made private — external callers must use fetchFolderContents() which
+    // handles demo data, sorting, and dispatches to the correct auth method.
+    private fun fetchFolderContentsViaOAuth(folderId: String, accessToken: String): List<DriveFile> {
         val url = "https://www.googleapis.com/drive/v3/files?q='$folderId'+in+parents+and+trashed=false&fields=files(id,name,mimeType,size,thumbnailLink)&pageSize=1000"
         val request = Request.Builder()
             .url(url)

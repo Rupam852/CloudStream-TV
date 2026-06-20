@@ -80,7 +80,11 @@ class DriveRepository(context: Context) {
             // Filter out items viewed more than 24 hours ago (86,400,000 ms)
             val now = System.currentTimeMillis()
             val filtered = rawList.filter { file ->
-                val time = file.timestamp ?: now
+                // R3 Fix: Use 0L (epoch) as fallback instead of `now`.
+                // Previously `timestamp ?: now` meant items without a timestamp
+                // were always treated as "just viewed" and NEVER expired.
+                // Now they are treated as infinitely old and expire on first cleanup.
+                val time = file.timestamp ?: 0L
                 now - time <= 86400000L
             }
             
