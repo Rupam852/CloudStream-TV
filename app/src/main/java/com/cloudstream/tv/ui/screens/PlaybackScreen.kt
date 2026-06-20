@@ -75,6 +75,8 @@ import androidx.tv.material3.Text
 import com.cloudstream.tv.data.DriveFile
 import com.cloudstream.tv.data.DriveRepository
 import com.cloudstream.tv.network.GoogleDriveClient
+import com.cloudstream.tv.network.NetworkUtils
+import com.cloudstream.tv.ui.components.ConnectivityDialog
 import com.cloudstream.tv.ui.components.TVFocusableItem
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import okhttp3.OkHttpClient
@@ -83,6 +85,8 @@ import kotlinx.coroutines.runBlocking
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -246,16 +250,43 @@ fun PlaybackScreen(
     // Retry counter for auto-recovery on player error (max 2 retries)
     var playerErrorRetryCount by remember { mutableIntStateOf(0) }
 
+    // Network retry dialog states
+    var showNetworkDialog by remember { mutableStateOf(false) }
+    var pendingNetworkAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var resolveTrigger by remember { mutableIntStateOf(0) }
+
     // Resolve URL on change
-    LaunchedEffect(activeFile) {
+    LaunchedEffect(activeFile, resolveTrigger) {
         isResolving = true
         resolvedUrl = null
-        val token = if (repository.isLoggedIn()) repository.getAccessToken() else null
-        val apiKey = repository.getApiKey()
-        oauthToken = token
-        val url = GoogleDriveClient.resolveDriveDirectUrl(activeFile.id, token, apiKey)
-        resolvedUrl = url
-        isResolving = false
+        try {
+            val token = if (repository.isLoggedIn()) {
+                withContext(Dispatchers.IO) { repository.getAccessToken() }
+            } else {
+                null
+            }
+            val apiKey = repository.getApiKey()
+            oauthToken = token
+            val url = withContext(Dispatchers.IO) {
+                GoogleDriveClient.resolveDriveDirectUrl(activeFile.id, token, apiKey)
+            }
+            if (url.isNullOrBlank()) {
+                throw java.io.IOException("Inaccessible or empty video URL")
+            }
+            resolvedUrl = url
+        } catch (e: Exception) {
+            e.printStackTrace()
+            if (e is java.io.IOException || !NetworkUtils.isInternetAvailable(context)) {
+                pendingNetworkAction = {
+                    resolveTrigger++
+                }
+                showNetworkDialog = true
+            } else {
+                showToast("Failed to resolve video link", Icons.Default.Pause)
+            }
+        } finally {
+            isResolving = false
+        }
     }
 
     // Track and save playback position when activeFile changes (e.g. Next/Previous transitions)
@@ -450,17 +481,32 @@ fun PlaybackScreen(
                     || error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW
                     || error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED
 
-                if (isRecoverable && playerErrorRetryCount < 2) {
-                    playerErrorRetryCount++
-                    val resumePos = currentPosition.coerceAtLeast(0L)
-                    Log.w("PlaybackScreen", "Recoverable error — attempting retry $playerErrorRetryCount at position $resumePos ms")
-                    showToast("Reconnecting... ($playerErrorRetryCount/2)", Icons.Default.PlayArrow)
-                    try {
-                        exoPlayer.prepare()
-                        if (resumePos > 0L) exoPlayer.seekTo(resumePos)
-                        exoPlayer.play()
-                    } catch (e: Exception) {
-                        Log.e("PlaybackScreen", "Recovery attempt $playerErrorRetryCount failed", e)
+                if (isRecoverable) {
+                    if (playerErrorRetryCount < 2) {
+                        playerErrorRetryCount++
+                        val resumePos = currentPosition.coerceAtLeast(0L)
+                        Log.w("PlaybackScreen", "Recoverable error — attempting retry $playerErrorRetryCount at position $resumePos ms")
+                        showToast("Reconnecting... ($playerErrorRetryCount/2)", Icons.Default.PlayArrow)
+                        try {
+                            exoPlayer.prepare()
+                            if (resumePos > 0L) exoPlayer.seekTo(resumePos)
+                            exoPlayer.play()
+                        } catch (e: Exception) {
+                            Log.e("PlaybackScreen", "Recovery attempt $playerErrorRetryCount failed", e)
+                        }
+                    } else {
+                        pendingNetworkAction = {
+                            val resumePos = currentPosition.coerceAtLeast(0L)
+                            try {
+                                playerErrorRetryCount = 0
+                                exoPlayer.prepare()
+                                if (resumePos > 0L) exoPlayer.seekTo(resumePos)
+                                exoPlayer.play()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                        showNetworkDialog = true
                     }
                 } else {
                     playerErrorRetryCount = 0
@@ -1008,6 +1054,20 @@ fun PlaybackScreen(
                     }
                 }
             }
+        }
+
+        if (showNetworkDialog) {
+            ConnectivityDialog(
+                onDismiss = {
+                    showNetworkDialog = false
+                    pendingNetworkAction = null
+                },
+                onRetry = {
+                    showNetworkDialog = false
+                    pendingNetworkAction?.invoke()
+                    pendingNetworkAction = null
+                }
+            )
         }
     }
 }

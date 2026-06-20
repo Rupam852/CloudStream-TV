@@ -48,6 +48,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.platform.LocalContext
+import com.cloudstream.tv.network.NetworkUtils
+import com.cloudstream.tv.ui.components.ConnectivityDialog
 
 sealed class ValidationState {
     object Idle : ValidationState()
@@ -63,10 +66,15 @@ fun OnboardingScreen(
     onOnboardingComplete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var urlInput by remember { mutableStateOf("") }
     var folderNameInput by remember { mutableStateOf("") }
     var validationState by remember { mutableStateOf<ValidationState>(ValidationState.Idle) }
     var showGoogleLoginDialogOption by remember { mutableStateOf<Int?>(null) }
+    
+    // Network retry dialog states
+    var showNetworkDialog by remember { mutableStateOf(false) }
+    var pendingNetworkAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     
     val coroutineScope = rememberCoroutineScope()
     
@@ -86,6 +94,12 @@ fun OnboardingScreen(
             return
         }
 
+        if (!NetworkUtils.isInternetAvailable(context)) {
+            pendingNetworkAction = { startValidation(url, customName) }
+            showNetworkDialog = true
+            return
+        }
+
         validationState = ValidationState.Validating
         coroutineScope.launch {
             val folderId = GoogleDriveClient.extractFolderId(url)
@@ -94,36 +108,53 @@ fun OnboardingScreen(
                 return@launch
             }
 
-            val isValid = withContext(Dispatchers.IO) {
-                val oauthToken = repository.getAccessToken()
-                GoogleDriveClient.validateFolder(folderId, repository.getApiKey(), oauthToken)
-            }
-
-            if (isValid) {
-                val finalName = customName.ifBlank {
-                    if (folderId == "demo-videos") "Demo Videos"
-                    else if (folderId == "demo-photos") "Demo Photos"
-                    else "Drive Folder (${folderId.take(6)}...)"
+            try {
+                val isValid = withContext(Dispatchers.IO) {
+                    val oauthToken = repository.getAccessToken()
+                    GoogleDriveClient.validateFolder(folderId, repository.getApiKey(), oauthToken)
                 }
-                val link = DriveLink(
-                    id = folderId,
-                    name = finalName,
-                    url = url
-                )
-                repository.saveLink(link)
-                repository.setLastSelectedFolderId(folderId)
-                validationState = ValidationState.Success
-                
-                // Wait briefly for visual feedback
-                kotlinx.coroutines.delay(1000)
-                onOnboardingComplete()
-            } else {
-                validationState = ValidationState.Error(
-                    if (repository.getApiKey().isNullOrBlank())
-                        "Could not access folder. Verify that anyone with the link can view it, or try adding a Google API Key in Settings."
-                    else
-                        "Could not access folder. Verify folder ID and API Key."
-                )
+
+                if (isValid) {
+                    val finalName = customName.ifBlank {
+                        if (folderId == "demo-videos") "Demo Videos"
+                        else if (folderId == "demo-photos") "Demo Photos"
+                        else "Drive Folder (${folderId.take(6)}...)"
+                    }
+                    val link = DriveLink(
+                        id = folderId,
+                        name = finalName,
+                        url = url
+                    )
+                    repository.saveLink(link)
+                    repository.setLastSelectedFolderId(folderId)
+                    validationState = ValidationState.Success
+                    
+                    // Wait briefly for visual feedback
+                    kotlinx.coroutines.delay(1000)
+                    onOnboardingComplete()
+                } else {
+                    if (!NetworkUtils.isInternetAvailable(context)) {
+                        pendingNetworkAction = { startValidation(url, customName) }
+                        showNetworkDialog = true
+                        validationState = ValidationState.Idle
+                    } else {
+                        validationState = ValidationState.Error(
+                            if (repository.getApiKey().isNullOrBlank())
+                                "Could not access folder. Verify that anyone with the link can view it, or try adding a Google API Key in Settings."
+                            else
+                                "Could not access folder. Verify folder ID and API Key."
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                if (e is java.io.IOException || !NetworkUtils.isInternetAvailable(context)) {
+                    pendingNetworkAction = { startValidation(url, customName) }
+                    showNetworkDialog = true
+                    validationState = ValidationState.Idle
+                } else {
+                    validationState = ValidationState.Error("Failed to connect: ${e.localizedMessage}")
+                }
             }
         }
     }
@@ -444,6 +475,19 @@ fun OnboardingScreen(
         )
     }
 
+    if (showNetworkDialog) {
+        ConnectivityDialog(
+            onDismiss = {
+                showNetworkDialog = false
+                pendingNetworkAction = null
+            },
+            onRetry = {
+                showNetworkDialog = false
+                pendingNetworkAction?.invoke()
+                pendingNetworkAction = null
+            }
+        )
+    }
 }
 
 

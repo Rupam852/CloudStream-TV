@@ -86,6 +86,8 @@ import com.cloudstream.tv.data.DriveFile
 import com.cloudstream.tv.data.DriveLink
 import com.cloudstream.tv.data.DriveRepository
 import com.cloudstream.tv.network.GoogleDriveClient
+import com.cloudstream.tv.network.NetworkUtils
+import com.cloudstream.tv.ui.components.ConnectivityDialog
 import com.cloudstream.tv.ui.components.TVCard
 import com.cloudstream.tv.ui.components.TVFocusableItem
 import com.cloudstream.tv.ui.components.TVSearchBar
@@ -109,6 +111,10 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    // Network retry dialog states
+    var showNetworkDialog by remember { mutableStateOf(false) }
+    var pendingNetworkAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     // Preferences & Layout States
     var isDarkTheme by remember { mutableStateOf(repository.isDarkTheme()) }
@@ -174,6 +180,14 @@ fun HomeScreen(
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) {
                 throw e
+            }
+            if (e is java.io.IOException || !NetworkUtils.isInternetAvailable(context)) {
+                pendingNetworkAction = {
+                    coroutineScope.launch {
+                        loadFolder(folderId)
+                    }
+                }
+                showNetworkDialog = true
             }
             loadingError = "Failed to load files: ${e.localizedMessage}"
             filesList = emptyList()
@@ -835,6 +849,10 @@ fun HomeScreen(
                         selectedFolderId = repository.getLastSelectedFolderId()
                         currentFolderId = selectedFolderId
                         showAddFolderDialog = false
+                    },
+                    onShowNetworkDialog = { action ->
+                        pendingNetworkAction = action
+                        showNetworkDialog = true
                     }
                 )
             }
@@ -867,6 +885,20 @@ fun HomeScreen(
                     }
                 )
             }
+
+            if (showNetworkDialog) {
+                ConnectivityDialog(
+                    onDismiss = {
+                        showNetworkDialog = false
+                        pendingNetworkAction = null
+                    },
+                    onRetry = {
+                        showNetworkDialog = false
+                        pendingNetworkAction?.invoke()
+                        pendingNetworkAction = null
+                    }
+                )
+            }
         }
     }
 }
@@ -877,7 +909,8 @@ fun HomeScreen(
 fun AddFolderOverlay(
     repository: DriveRepository,
     onDismiss: () -> Unit,
-    onFolderAdded: () -> Unit
+    onFolderAdded: () -> Unit,
+    onShowNetworkDialog: (() -> Unit) -> Unit
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -984,28 +1017,54 @@ fun AddFolderOverlay(
                                         isVerifying = false
                                         return@launch
                                     }
-                                    val isValid = withContext(Dispatchers.IO) {
-                                        val oauthToken = repository.getAccessToken()
-                                        GoogleDriveClient.validateFolder(folderId, repository.getApiKey(), oauthToken)
+
+                                    var performValidation: (() -> Unit)? = null
+                                    performValidation = {
+                                        isVerifying = true
+                                        scope.launch {
+                                            try {
+                                                val isValid = withContext(Dispatchers.IO) {
+                                                    val oauthToken = repository.getAccessToken()
+                                                    GoogleDriveClient.validateFolder(folderId, repository.getApiKey(), oauthToken)
+                                                }
+                                                if (isValid) {
+                                                    val link = DriveLink(
+                                                        id = folderId,
+                                                        name = nameInput.ifBlank { "Drive Folder (${folderId.take(6)}...)" },
+                                                        url = urlInput
+                                                    )
+                                                    repository.saveLink(link)
+                                                    repository.setLastSelectedFolderId(folderId)
+                                                    isVerifying = false
+                                                    Toast.makeText(context, "Folder added successfully!", Toast.LENGTH_SHORT).show()
+                                                    onFolderAdded()
+                                                } else {
+                                                    if (!NetworkUtils.isInternetAvailable(context)) {
+                                                        isVerifying = false
+                                                        onShowNetworkDialog(performValidation!!)
+                                                    } else {
+                                                        errorMsg = "Verification failed. Link is private or inaccessible."
+                                                        isVerifying = false
+                                                    }
+                                                }
+                                            } catch (e: Exception) {
+                                                isVerifying = false
+                                                if (e is java.io.IOException || !NetworkUtils.isInternetAvailable(context)) {
+                                                    onShowNetworkDialog(performValidation!!)
+                                                } else {
+                                                    errorMsg = "Verification failed: ${e.localizedMessage}"
+                                                }
+                                            }
+                                        }
                                     }
-                                    if (isValid) {
-                                        val link = DriveLink(
-                                            id = folderId,
-                                            name = nameInput.ifBlank { "Drive Folder (${folderId.take(6)}...)" },
-                                            url = urlInput
-                                        )
-                                        repository.saveLink(link)
-                                        repository.setLastSelectedFolderId(folderId)
-                                        // H2 Fix: isVerifying must be reset before calling onFolderAdded().
-                                        // Previously it was never set to false on success, leaving the
-                                        // spinner perpetually spinning if anything went wrong post-dismiss.
+
+                                    if (!NetworkUtils.isInternetAvailable(context)) {
                                         isVerifying = false
-                                        Toast.makeText(context, "Folder added successfully!", Toast.LENGTH_SHORT).show()
-                                        onFolderAdded()
-                                    } else {
-                                        errorMsg = "Verification failed. Link is private or inaccessible."
-                                        isVerifying = false
+                                        onShowNetworkDialog(performValidation)
+                                        return@launch
                                     }
+
+                                    performValidation()
                                 }
                             },
                             shape = RoundedCornerShape(8.dp)
