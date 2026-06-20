@@ -237,10 +237,11 @@ fun SlideshowScreen(
             label = "photoFade"
         ) { photo ->
             // S4 Fix: Only build the image request once authentication is resolved.
-            // Previously the image was built immediately with oauthToken=null, causing a
-            // 403 on the first request, then rebuilt when the token arrived — doubling
-            // network calls and showing a brief error state.
-            val tokenResolved = oauthToken != null || !apiKey.isNullOrBlank() || photo.id.startsWith("http")
+            // BUG-09 Fix: For public folders (no OAuth login, no API key), oauthToken will
+            // always be null. The original check kept tokenResolved=false forever, preventing
+            // images from rendering (blank screen). Now we resolve immediately for public access.
+            val isPublicAccess = !repository.isLoggedIn() && repository.getApiKey().isNullOrBlank()
+            val tokenResolved = oauthToken != null || !apiKey.isNullOrBlank() || isPublicAccess || photo.id.startsWith("http")
             val imageModel = remember(photo, oauthToken, apiKey) {
                 val token = oauthToken
                 val key = apiKey
@@ -255,7 +256,7 @@ fun SlideshowScreen(
                         .data("https://www.googleapis.com/drive/v3/files/${photo.id}?alt=media&key=$key")
                         .crossfade(true)
                         .build()
-                    else -> photo.streamUrl // fallback: public streamUrl or will 403
+                    else -> photo.streamUrl // public folder: use direct streamUrl
                 }
             }
             // Only render once auth token is resolved to avoid a 403 flash on first frame

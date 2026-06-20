@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,7 +89,12 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     Screen.Playback -> {
-                        activeFile?.let { file ->
+                        val file = activeFile
+                        if (file == null) {
+                            // BUG-12 Fix: Guard against null activeFile on Playback screen.
+                            // Without this, the screen renders blank with no back handler — the user is stuck.
+                            LaunchedEffect(Unit) { currentScreen = Screen.Home }
+                        } else {
                             PlaybackScreen(
                                 currentFile = file,
                                 playlist = mediaPlaylist,
@@ -101,7 +107,11 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     Screen.Slideshow -> {
-                        activeFile?.let { file ->
+                        val file = activeFile
+                        if (file == null) {
+                            // BUG-12 Fix: Same guard for Slideshow — null activeFile = redirect to Home
+                            LaunchedEffect(Unit) { currentScreen = Screen.Home }
+                        } else {
                             SlideshowScreen(
                                 currentFile = file,
                                 photos = mediaPlaylist,

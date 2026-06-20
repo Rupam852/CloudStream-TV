@@ -227,21 +227,25 @@ class DriveRepository(context: Context) {
         return tokenMutex.withLock {
             val currentAccessToken = prefs.getString(KEY_OAUTH_ACCESS_TOKEN, null)
             val currentExpiry = prefs.getLong(KEY_OAUTH_EXPIRY, 0L)
-            
+            // BUG-05 Fix: Re-read refreshToken from prefs INSIDE the lock.
+            // The outer refreshToken was captured before the lock was acquired — it could
+            // be stale if another coroutine invalidated the token in the meantime.
+            val currentRefreshToken = prefs.getString(KEY_OAUTH_REFRESH_TOKEN, null)
+
             if (currentAccessToken != null && System.currentTimeMillis() + 300000 <= currentExpiry) {
                 return@withLock currentAccessToken
             }
-            
-            if (refreshToken != null) {
+
+            if (currentRefreshToken != null) {
                 val clientId = getOAuthClientId()
                 val clientSecret = getOAuthClientSecret()
-                when (val result = com.cloudstream.tv.network.GoogleDriveClient.refreshAccessToken(clientId, clientSecret, refreshToken)) {
+                when (val result = com.cloudstream.tv.network.GoogleDriveClient.refreshAccessToken(clientId, clientSecret, currentRefreshToken)) {
                     is com.cloudstream.tv.network.TokenResult.Success -> {
                         val tokenResponse = result.response
                         if (tokenResponse.access_token != null) {
                             val newAccessToken = tokenResponse.access_token
                             val newExpiry = System.currentTimeMillis() + (tokenResponse.expires_in ?: 3600) * 1000
-                            saveOAuthTokens(newAccessToken, refreshToken, newExpiry, getOAuthEmail())
+                            saveOAuthTokens(newAccessToken, currentRefreshToken, newExpiry, getOAuthEmail())
                             newAccessToken
                         } else {
                             currentAccessToken

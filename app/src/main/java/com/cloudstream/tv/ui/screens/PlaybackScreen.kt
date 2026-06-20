@@ -169,26 +169,11 @@ fun PlaybackScreen(
         }
     }
 
-    // Monitor audio session ID changes (both initial state and during playback transitions)
-    LaunchedEffect(exoPlayer) {
-        while (true) {
-            val currentSessionId = exoPlayer.audioSessionId
-            if (currentSessionId != 0 && currentSessionId != audioSessionIdState) {
-                Log.d("PlaybackScreen", "Detected audioSessionId change: $currentSessionId (was $audioSessionIdState)")
-                audioSessionIdState = currentSessionId
-                try {
-                    loudnessEnhancer?.release()
-                    val enhancer = LoudnessEnhancer(currentSessionId)
-                    loudnessEnhancer = enhancer
-                    applyAudioBoost(enhancer, audioBoostLevel)
-                    Log.d("PlaybackScreen", "LoudnessEnhancer attached to session $currentSessionId successfully")
-                } catch (e: Exception) {
-                    Log.e("PlaybackScreen", "Error attaching LoudnessEnhancer to session $currentSessionId", e)
-                }
-            }
-            delay(1000)
-        }
-    }
+    // Monitor audio session ID changes via Player.Listener (onAudioSessionIdChanged).
+    // BUG-06 Fix: Removed the redundant polling LaunchedEffect that previously also created
+    // a LoudnessEnhancer every second. Both paths fired simultaneously causing dual enhancer
+    // instances on the same audio session, risking distortion and resource waste.
+    // The Player.Listener callback below is the single authoritative source for this.
 
     // Playback and UI States
     var isPlaying by remember { mutableStateOf(exoPlayer.playWhenReady) }
@@ -292,12 +277,16 @@ fun PlaybackScreen(
     // Track and save playback position when activeFile changes (e.g. Next/Previous transitions)
     DisposableEffect(activeFile) {
         onDispose {
+            // BUG-02 Fix: Read position from the Compose state (currentPosition) which is updated
+            // by the periodic LaunchedEffect. Do NOT call exoPlayer.currentPosition here —
+            // the player may already be released if both this DisposableEffect and the main
+            // DisposableEffect(exoPlayer) are disposed simultaneously on back navigation.
             try {
-                val currentPos = exoPlayer.currentPosition
-                val totalDur = exoPlayer.duration
-                if (totalDur > 0 && currentPos > 3000 && currentPos < totalDur * 0.95) {
-                    repository.savePlaybackPosition(activeFile.id, currentPos)
-                    Log.d("PlaybackScreen", "Saved transition position $currentPos for file ${activeFile.name}")
+                val savedCurrentPos = currentPosition
+                val savedDuration = duration
+                if (savedDuration > 0 && savedCurrentPos > 3000 && savedCurrentPos < savedDuration * 0.95) {
+                    repository.savePlaybackPosition(activeFile.id, savedCurrentPos)
+                    Log.d("PlaybackScreen", "Saved transition position $savedCurrentPos for file ${activeFile.name}")
                 }
             } catch (e: Exception) {
                 Log.e("PlaybackScreen", "Failed to save position on transition", e)
@@ -384,10 +373,14 @@ fun PlaybackScreen(
         delay(45 * 60 * 1000L)
         while (true) {
             Log.i("PlaybackScreen", "Token watchdog: proactively refreshing OAuth token")
-            val currentPos = exoPlayer.currentPosition
+            val currentPos = currentPosition // BUG-07 Fix: read from Compose state, not exoPlayer directly
             val wasPlaying = exoPlayer.playWhenReady
+            // BUG-07 Fix: Always fetch the fresh token from repository.
+            // Do NOT compare against `oauthToken` Compose state — it may be stale.
+            // getAccessToken() already handles whether refresh is actually needed.
+            val previousToken = oauthToken
             val newToken = repository.getAccessToken()
-            if (newToken != null && newToken != oauthToken) {
+            if (newToken != null && newToken != previousToken) {
                 // Token was refreshed — rebuild media source at current position
                 Log.i("PlaybackScreen", "Token changed — rebuilding media source at $currentPos ms")
                 val url = resolvedUrl ?: break
@@ -516,12 +509,17 @@ fun PlaybackScreen(
         }
         exoPlayer.addListener(listener)
         onDispose {
+            // Unhook listener first before any other cleanup
+            exoPlayer.removeListener(listener)
             try {
-                val currentPos = exoPlayer.currentPosition
-                val totalDur = exoPlayer.duration
-                if (totalDur > 0 && currentPos > 3000 && currentPos < totalDur * 0.95) {
-                    repository.savePlaybackPosition(activeFile.id, currentPos)
-                    Log.d("PlaybackScreen", "Saved exit position $currentPos for file ${activeFile.name}")
+                // BUG-02/BUG-03 Fix: Use Compose state vars (currentPosition, duration) —
+                // NOT exoPlayer.currentPosition/duration. The player may already be in a
+                // released or invalid state by the time onDispose runs.
+                val savedPos = currentPosition
+                val savedDur = duration
+                if (savedDur > 0 && savedPos > 3000 && savedPos < savedDur * 0.95) {
+                    repository.savePlaybackPosition(activeFile.id, savedPos)
+                    Log.d("PlaybackScreen", "Saved exit position $savedPos for file ${activeFile.name}")
                 } else {
                     repository.clearPlaybackPosition(activeFile.id)
                 }
@@ -529,7 +527,6 @@ fun PlaybackScreen(
                 Log.e("PlaybackScreen", "Failed to save position on exit", e)
             }
 
-            exoPlayer.removeListener(listener)
             try {
                 loudnessEnhancer?.release()
             } catch (e: Exception) {

@@ -53,11 +53,11 @@ object GoogleDriveClient {
         return null
     }
 
-    fun validateFolder(folderId: String, apiKey: String?, oauthToken: String?): Boolean {
+    suspend fun validateFolder(folderId: String, apiKey: String?, oauthToken: String?): Boolean = withContext(Dispatchers.IO) {
         if (folderId == "demo-videos" || folderId == "demo-photos") {
-            return true
+            return@withContext true
         }
-        return try {
+        try {
             // G1 Fix: Previously this function called fetchFolderContents() AFTER the mimeType
             // check, causing 2 network requests for every folder validation. The mimeType check
             // already confirms the resource is a valid accessible folder — the extra listing
@@ -75,11 +75,11 @@ object GoogleDriveClient {
                         val mimeType = json.get("mimeType")?.asString ?: ""
                         if (mimeType != "application/vnd.google-apps.folder") {
                             Log.w(TAG, "Resource is not a folder: $folderId, mimeType: $mimeType")
-                            return false
+                            return@withContext false
                         }
                     } else {
                         Log.e(TAG, "Resource check failed with HTTP ${response.code}")
-                        return false
+                        return@withContext false
                     }
                 }
             } else if (!apiKey.isNullOrBlank()) {
@@ -94,11 +94,11 @@ object GoogleDriveClient {
                         val mimeType = json.get("mimeType")?.asString ?: ""
                         if (mimeType != "application/vnd.google-apps.folder") {
                             Log.w(TAG, "Resource is not a folder: $folderId, mimeType: $mimeType")
-                            return false
+                            return@withContext false
                         }
                     } else {
                         Log.e(TAG, "Resource check failed with HTTP ${response.code}")
-                        return false
+                        return@withContext false
                     }
                 }
             }
@@ -310,7 +310,7 @@ object GoogleDriveClient {
             val filesMap = mutableMapOf<String, DriveFile>()
 
             // Regex 1: Scan for JSON pattern with parent array (handles escaped/unescaped quotes)
-            val patternJson1 = Pattern.compile("""\[\\?"([a-zA-Z0-9_-]{28,45})\\?",\[[^\]]*\],\\?"((?:[^"\\]|\\.)+)\\?",\\?"([^\\"]+)\\?"""")
+            val patternJson1 = Pattern.compile("""\[\\?"([a-zA-Z0-9_-]{20,60})\\?",\[[^\]]*\],\\?"((?:[^"\\]|\\.)+)\\?",\\?"([^\\"]+)\\?"""")
             val matcherJson1 = patternJson1.matcher(html)
             while (matcherJson1.find()) {
                 val id = matcherJson1.group(1)!!
@@ -326,7 +326,7 @@ object GoogleDriveClient {
             }
 
             // Regex 2: Scan for JSON pattern with null parent (handles escaped/unescaped quotes)
-            val patternJson2 = Pattern.compile("""\[\\?"([a-zA-Z0-9_-]{28,45})\\?",null,\\?"((?:[^"\\]|\\.)+)\\?",\\?"([^\\"]+)\\?"""")
+            val patternJson2 = Pattern.compile("""\[\\?"([a-zA-Z0-9_-]{20,60})\\?",null,\\?"((?:[^"\\]|\\.)+)\\?",\\?"([^\\"]+)\\?"""")
             val matcherJson2 = patternJson2.matcher(html)
             while (matcherJson2.find()) {
                 val id = matcherJson2.group(1)!!
@@ -343,7 +343,7 @@ object GoogleDriveClient {
 
             // Regex 2: Fallback scan for general files/folders links in case JSON structure varies
             // Subfolder format: /drive/folders/SUBFOLDER_ID
-            val patternFolders = Pattern.compile("drive/folders/([a-zA-Z0-9_-]{28,45})")
+            val patternFolders = Pattern.compile("drive/folders/([a-zA-Z0-9_-]{20,60})")
             val matcherFolders = patternFolders.matcher(html)
             while (matcherFolders.find()) {
                 val id = matcherFolders.group(1)!!
@@ -358,7 +358,7 @@ object GoogleDriveClient {
             }
 
             // File format: /file/d/FILE_ID
-            val patternFiles = Pattern.compile("file/d/([a-zA-Z0-9_-]{28,45})")
+            val patternFiles = Pattern.compile("file/d/([a-zA-Z0-9_-]{20,60})")
             val matcherFiles = patternFiles.matcher(html)
             while (matcherFiles.find()) {
                 val id = matcherFiles.group(1)!!
@@ -380,7 +380,7 @@ object GoogleDriveClient {
             // e.g. class="entry-name" or similar elements.
             // Using a tag-based regex to find folder/file IDs, then extracting aria-label
             // within the tag to support order-independent attributes.
-            val tagPattern = Pattern.compile("<[a-zA-Z0-9]+[^>]+(?:file/d/|folders/)([a-zA-Z0-9_-]{28,45})[^>]*>", Pattern.CASE_INSENSITIVE)
+            val tagPattern = Pattern.compile("<[a-zA-Z0-9]+[^>]+(?:file/d/|folders/)([a-zA-Z0-9_-]{20,60})[^>]*>", Pattern.CASE_INSENSITIVE)
             val tagMatcher = tagPattern.matcher(html)
             while (tagMatcher.find()) {
                 val tagContent = tagMatcher.group(0)!!

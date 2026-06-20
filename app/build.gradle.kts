@@ -22,11 +22,16 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // BUG-17 Fix: Enable R8 minification for release.
+            // This shrinks the APK, removes unused code, and obfuscates class/method names
+            // so sensitive constants like DEFAULT_CLIENT_SECRET are not readable in decompiled APK.
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // BUG-14 Note: Currently using debug signing for easy sideloading.
+            // For Play Store publishing, replace this with a proper release signing config.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

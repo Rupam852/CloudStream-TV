@@ -61,13 +61,18 @@ fun ConnectivityDialog(
     // Auto-check for internet connection every 2 seconds.
     // If connection is restored, automatically trigger onRetry() and dismiss dialog.
     LaunchedEffect(Unit) {
-        while (true) {
+        // BUG-13 Fix: Use a local flag to prevent double-invocation of onRetry() before
+        // the composable fully disposes. The `break` exits the loop, but in a pathological
+        // race the next delay cycle could theoretically fire before cleanup.
+        var hasTriggered = false
+        while (!hasTriggered) {
             delay(2000L)
             if (NetworkUtils.isInternetAvailable(context)) {
+                hasTriggered = true
                 isChecking = true
                 delay(500L) // Visual feedback spinner/check
                 onRetry()
-                break
+                return@LaunchedEffect // BUG-13: explicit return prevents any further iterations
             }
         }
     }

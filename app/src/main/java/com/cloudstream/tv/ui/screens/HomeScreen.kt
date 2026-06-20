@@ -160,6 +160,9 @@ fun HomeScreen(
 
     // Load folder contents
     suspend fun loadFolder(folderId: String?) {
+        // BUG-18 Fix: Clear stale FocusRequesters from previous folder.
+        // Without this, the map grows indefinitely as user browses many folders.
+        fileFocusRequesters.clear()
         if (folderId == null) {
             filesList = emptyList()
             return
@@ -188,8 +191,12 @@ fun HomeScreen(
                     }
                 }
                 showNetworkDialog = true
+                // BUG-04 Fix: Only set loadingError when NOT showing the network dialog.
+                // Previously loadingError was always set, causing the error text to show
+                // underneath or after the dialog dismiss even during a retry flow.
+            } else {
+                loadingError = "Failed to load files: ${e.localizedMessage}"
             }
-            loadingError = "Failed to load files: ${e.localizedMessage}"
             filesList = emptyList()
         } finally {
             isLoadingFiles = false
@@ -404,10 +411,15 @@ fun HomeScreen(
                                     },
                                     onLongClick = {
                                         // Option to remove from history
+                                        // BUG-08 Fix: addToRecentlyViewed() inserts at index 0,
+                                        // so iterating forward re-adds in reverse order.
+                                        // Iterate in REVERSE to preserve original list order.
                                         val current = recentlyViewedList.toMutableList()
                                         current.remove(file)
                                         repository.clearRecentlyViewed()
-                                        current.forEach { repository.addToRecentlyViewed(it) }
+                                        for (i in current.indices.reversed()) {
+                                            repository.addToRecentlyViewed(current[i])
+                                        }
                                         recentlyViewedList = repository.getRecentlyViewed()
                                         Toast.makeText(context, "Removed from history", Toast.LENGTH_SHORT).show()
                                     }

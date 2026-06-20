@@ -464,13 +464,18 @@ fun OnboardingScreen(
     }
 
     if (showGoogleLoginDialogOption != null) {
+        // BUG-10 Fix: Capture current values into local vals before passing to the lambda.
+        // Compose lambdas closed over state can hold stale snapshots if the state changes
+        // while the dialog is open. By capturing here, we guarantee the correct values.
+        val capturedUrl = urlInput
+        val capturedName = folderNameInput
         GoogleLoginOverlay(
             repository = repository,
             loginOption = showGoogleLoginDialogOption!!,
             onDismiss = { showGoogleLoginDialogOption = null },
             onLoginSuccess = {
                 showGoogleLoginDialogOption = null
-                startValidation(urlInput, folderNameInput)
+                startValidation(capturedUrl, capturedName)
             }
         )
     }
