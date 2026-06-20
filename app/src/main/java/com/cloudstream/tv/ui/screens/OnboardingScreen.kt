@@ -45,6 +45,7 @@ import com.cloudstream.tv.network.GoogleDriveClient
 import com.cloudstream.tv.ui.components.TVFocusableItem
 import com.cloudstream.tv.ui.components.TVSearchBar
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -75,7 +76,7 @@ fun OnboardingScreen(
 
     // Auto-focus input on launch
     LaunchedEffect(Unit) {
-        delayMillis(500)
+        delay(500)
         inputFocusRequester.requestFocus()
     }
 
@@ -228,7 +229,13 @@ fun OnboardingScreen(
             Spacer(modifier = Modifier.height(6.dp))
             TVSearchBar(
                 value = urlInput,
-                onValueChange = { urlInput = it },
+                onValueChange = {
+                    urlInput = it
+                    // O3 Fix: Clear stale error message as soon as user starts editing
+                    if (validationState is ValidationState.Error) {
+                        validationState = ValidationState.Idle
+                    }
+                },
                 focusRequester = inputFocusRequester,
                 onSearchAction = { nameFocusRequester.requestFocus() }
             )
@@ -245,7 +252,13 @@ fun OnboardingScreen(
             Spacer(modifier = Modifier.height(6.dp))
             TVSearchBar(
                 value = folderNameInput,
-                onValueChange = { folderNameInput = it },
+                onValueChange = {
+                    folderNameInput = it
+                    // O3 Fix: Clear stale error message as soon as user starts editing
+                    if (validationState is ValidationState.Error) {
+                        validationState = ValidationState.Idle
+                    }
+                },
                 focusRequester = nameFocusRequester,
                 onSearchAction = { validateFocusRequester.requestFocus() }
             )
@@ -297,7 +310,11 @@ fun OnboardingScreen(
                         modifier = Modifier.padding(bottom = 2.dp)
                     )
 
-                    // Button Option 1
+                    // O2 Fix: Option 1 gets its own FocusRequester.
+                    // Previously it shared validateFocusRequester with the logged-in
+                    // "Link Folder" button — two nodes sharing one FocusRequester causes
+                    // undefined focus behavior and potential crashes.
+                    val option1FocusRequester = remember { FocusRequester() }
                     TVFocusableItem(
                         onClick = {
                             if (validationState == ValidationState.Validating) return@TVFocusableItem
@@ -307,7 +324,7 @@ fun OnboardingScreen(
                             }
                             showGoogleLoginDialogOption = 1
                         },
-                        modifier = Modifier.focusRequester(validateFocusRequester),
+                        modifier = Modifier.focusRequester(option1FocusRequester),
                         shape = RoundedCornerShape(20.dp)
                     ) { isFocused ->
                         Box(
@@ -431,7 +448,4 @@ fun OnboardingScreen(
 
 
 
-// Simple delay helper to avoid handler overhead
-private suspend fun delayMillis(ms: Long) {
-    kotlinx.coroutines.delay(ms)
-}
+// Simple delay helper removed — use kotlinx.coroutines.delay() directly

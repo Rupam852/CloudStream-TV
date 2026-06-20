@@ -115,7 +115,8 @@ fun HomeScreen(
     var isGridView by remember { mutableStateOf(repository.isGridView()) }
 
     // Saved folders list
-    var savedFolders = remember { mutableStateListOf<DriveLink>().apply { addAll(repository.getSavedLinks()) } }
+    // H5 Fix: val instead of var — this is a mutableStateListOf and is never reassigned.
+    val savedFolders = remember { mutableStateListOf<DriveLink>().apply { addAll(repository.getSavedLinks()) } }
     var selectedFolderId by remember { mutableStateOf(repository.getLastSelectedFolderId()) }
     
     // Navigation stack for folders
@@ -229,6 +230,8 @@ fun HomeScreen(
         }
     }
 
+
+
     var showExitDialog by remember { mutableStateOf(false) }
     val isOverlayActive = showAddFolderDialog || showExitDialog || (folderOptionsActiveFolder != null)
 
@@ -255,6 +258,13 @@ fun HomeScreen(
 
     // Recently viewed list
     var recentlyViewedList by remember { mutableStateOf(repository.getRecentlyViewed()) }
+
+    // H4 Fix: Refresh recentlyViewedList whenever lastPlayedFileId changes
+    // (i.e. user just returned from PlaybackScreen/SlideshowScreen).
+    // Without this, the "Recently Streamed" shelf shows stale data after coming back.
+    LaunchedEffect(lastPlayedFileId) {
+        recentlyViewedList = repository.getRecentlyViewed()
+    }
 
     CloudStreamTheme.extraColors.run {
         Box(
@@ -533,7 +543,9 @@ fun HomeScreen(
                                             icon = icon,
                                             onClick = {
                                                 if (file.isFolder) {
-                                                    folderNavigationStack.add(currentFolderId!!)
+                                                    // H1 Fix: Safe null check — currentFolderId can be null on
+                                                    // fresh install. Previously used !! which throws NullPointerException.
+                                                    currentFolderId?.let { folderNavigationStack.add(it) }
                                                     currentFolderId = file.id
                                                 } else if (file.isVideo) {
                                                     repository.addToRecentlyViewed(file)
@@ -590,7 +602,8 @@ fun HomeScreen(
                                         TVFocusableItem(
                                             onClick = {
                                                 if (file.isFolder) {
-                                                    folderNavigationStack.add(currentFolderId!!)
+                                                    // H1 Fix: Safe null check (list view, same fix as grid view)
+                                                    currentFolderId?.let { folderNavigationStack.add(it) }
                                                     currentFolderId = file.id
                                                 } else if (file.isVideo) {
                                                     repository.addToRecentlyViewed(file)
@@ -882,7 +895,11 @@ fun AddFolderOverlay(
 
         val focusRequester = remember { FocusRequester() }
         LaunchedEffect(Unit) {
-            focusRequester.requestFocus()
+            // H6 Fix: Add delay — Dialog takes time to compose and attach its nodes.
+            // Without this, requestFocus() fires before the composable is attached
+            // and silently fails, leaving keyboard input unresponsive.
+            kotlinx.coroutines.delay(150)
+            try { focusRequester.requestFocus() } catch (_: Exception) {}
         }
 
         Box(
@@ -979,6 +996,10 @@ fun AddFolderOverlay(
                                         )
                                         repository.saveLink(link)
                                         repository.setLastSelectedFolderId(folderId)
+                                        // H2 Fix: isVerifying must be reset before calling onFolderAdded().
+                                        // Previously it was never set to false on success, leaving the
+                                        // spinner perpetually spinning if anything went wrong post-dismiss.
+                                        isVerifying = false
                                         Toast.makeText(context, "Folder added successfully!", Toast.LENGTH_SHORT).show()
                                         onFolderAdded()
                                     } else {
@@ -1099,10 +1120,16 @@ fun GoogleLoginOverlay(
             }
         }
 
+        // H3 Fix: Countdown loop.
+        // Added explicit check for `isPolling` at every tick so the coroutine stops
+        // immediately when auth succeeds or an error occurs — previously the countdown
+        // kept running for the full 5 minutes even after a successful login, leaking
+        // a coroutine and wasting CPU unnecessarily.
         LaunchedEffect(userCode) {
             if (userCode.isNotBlank()) {
                 while (timeRemainingState > 0 && isPolling) {
                     kotlinx.coroutines.delay(1000)
+                    if (!isPolling) break // exit immediately if polling ended
                     timeRemainingState -= 1
                 }
             }

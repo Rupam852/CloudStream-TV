@@ -141,16 +141,25 @@ fun SlideshowScreen(
         }
     }
 
-    // Auto-focus play button on overlay reveal
+    // S1 Fix: Focus play button after controls appear.
+    // Delay must be >= AnimatedVisibility fade-in (400ms) — otherwise the composable
+    // is not yet attached and requestFocus() silently fails, swallowing key events.
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) {
-            delay(100)
-            playButtonFocusRequester.requestFocus()
+            delay(450)
+            try {
+                playButtonFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                // Composable not yet attached — safe to ignore
+            }
         }
     }
 
-    // Timer loop for cycling images
-    LaunchedEffect(isPlaying, activeIndex, intervalSeconds) {
+    // S2 Fix: Timer loop for cycling images.
+    // userActivityTrigger added as a key so that any user action (next/prev/play/pause)
+    // resets the full interval timer. Without this, after manual navigation the timer
+    // would fire at an unexpected time (e.g. 1 second later if already 4s into interval).
+    LaunchedEffect(isPlaying, activeIndex, intervalSeconds, userActivityTrigger) {
         if (isPlaying) {
             delay(intervalSeconds * 1000L)
             activeIndex = (activeIndex + 1) % photos.size
@@ -227,32 +236,37 @@ fun SlideshowScreen(
             modifier = Modifier.fillMaxSize(),
             label = "photoFade"
         ) { photo ->
+            // S4 Fix: Only build the image request once authentication is resolved.
+            // Previously the image was built immediately with oauthToken=null, causing a
+            // 403 on the first request, then rebuilt when the token arrived — doubling
+            // network calls and showing a brief error state.
+            val tokenResolved = oauthToken != null || !apiKey.isNullOrBlank() || photo.id.startsWith("http")
             val imageModel = remember(photo, oauthToken, apiKey) {
                 val token = oauthToken
                 val key = apiKey
-                if (photo.id.startsWith("http")) {
-                    photo.id
-                } else if (token != null) {
-                    ImageRequest.Builder(context)
+                when {
+                    photo.id.startsWith("http") -> photo.id
+                    token != null -> ImageRequest.Builder(context)
                         .data("https://www.googleapis.com/drive/v3/files/${photo.id}?alt=media")
                         .setHeader("Authorization", "Bearer $token")
                         .crossfade(true)
                         .build()
-                } else if (!key.isNullOrBlank()) {
-                    ImageRequest.Builder(context)
+                    !key.isNullOrBlank() -> ImageRequest.Builder(context)
                         .data("https://www.googleapis.com/drive/v3/files/${photo.id}?alt=media&key=$key")
                         .crossfade(true)
                         .build()
-                } else {
-                    photo.streamUrl
+                    else -> photo.streamUrl // fallback: public streamUrl or will 403
                 }
             }
-            AsyncImage(
-                model = imageModel,
-                contentDescription = photo.name,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize()
-            )
+            // Only render once auth token is resolved to avoid a 403 flash on first frame
+            if (tokenResolved) {
+                AsyncImage(
+                    model = imageModel,
+                    contentDescription = photo.name,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
 
         // 2. Control overlays (Top detail & Bottom bar)
