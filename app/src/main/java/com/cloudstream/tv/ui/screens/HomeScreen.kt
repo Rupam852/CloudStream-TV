@@ -1035,6 +1035,15 @@ fun AddFolderOverlay(
                                         isVerifying = true
                                         scope.launch {
                                             try {
+                                                val isPublic = withContext(Dispatchers.IO) {
+                                                    GoogleDriveClient.isFolderPublic(folderId)
+                                                }
+                                                if (!isPublic) {
+                                                    errorMsg = "Your folder is not public. Please share the folder as 'Anyone with the link' (Viewer) and try again."
+                                                    isVerifying = false
+                                                    return@launch
+                                                }
+
                                                 val isValid = withContext(Dispatchers.IO) {
                                                     val oauthToken = repository.getAccessToken()
                                                     GoogleDriveClient.validateFolder(folderId, repository.getApiKey(), oauthToken)

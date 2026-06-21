@@ -109,6 +109,14 @@ fun OnboardingScreen(
             }
 
             try {
+                val isPublic = withContext(Dispatchers.IO) {
+                    GoogleDriveClient.isFolderPublic(folderId)
+                }
+                if (!isPublic) {
+                    validationState = ValidationState.Error("Your folder is not public. Please share the folder as 'Anyone with the link' (Viewer) and try again.")
+                    return@launch
+                }
+
                 val isValid = withContext(Dispatchers.IO) {
                     val oauthToken = repository.getAccessToken()
                     GoogleDriveClient.validateFolder(folderId, repository.getApiKey(), oauthToken)

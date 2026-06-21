@@ -63,7 +63,7 @@ object GoogleDriveClient {
             // already confirms the resource is a valid accessible folder — the extra listing
             // was redundant and its result was thrown away.
             if (!oauthToken.isNullOrBlank()) {
-                val url = "https://www.googleapis.com/drive/v3/files/$folderId?fields=mimeType"
+                val url = "https://www.googleapis.com/drive/v3/files/$folderId?fields=mimeType&supportsAllDrives=true"
                 val request = Request.Builder()
                     .url(url)
                     .header("Authorization", "Bearer $oauthToken")
@@ -83,7 +83,7 @@ object GoogleDriveClient {
                     }
                 }
             } else if (!apiKey.isNullOrBlank()) {
-                val url = "https://www.googleapis.com/drive/v3/files/$folderId?fields=mimeType&key=$apiKey"
+                val url = "https://www.googleapis.com/drive/v3/files/$folderId?fields=mimeType&key=$apiKey&supportsAllDrives=true"
                 val request = Request.Builder()
                     .url(url)
                     .build()
@@ -110,15 +110,36 @@ object GoogleDriveClient {
         }
     }
 
+    suspend fun isFolderPublic(folderId: String): Boolean = withContext(Dispatchers.IO) {
+        if (folderId == "demo-videos" || folderId == "demo-photos") {
+            return@withContext true
+        }
+        val url = "https://drive.google.com/drive/folders/$folderId"
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .build()
+        try {
+            client.newCall(request).execute().use { response ->
+                val finalUrl = response.request.url.toString()
+                response.isSuccessful && !finalUrl.contains("accounts.google.com")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking if folder is public: $folderId", e)
+            false
+        }
+    }
+
+
     suspend fun resolveDriveDirectUrl(fileId: String, oauthToken: String? = null, apiKey: String? = null): String = withContext(Dispatchers.IO) {
         if (fileId.startsWith("http")) {
             return@withContext fileId
         }
         if (!oauthToken.isNullOrBlank()) {
-            return@withContext "https://www.googleapis.com/drive/v3/files/$fileId?alt=media"
+            return@withContext "https://www.googleapis.com/drive/v3/files/$fileId?alt=media&supportsAllDrives=true"
         }
         if (!apiKey.isNullOrBlank()) {
-            return@withContext "https://www.googleapis.com/drive/v3/files/$fileId?alt=media&key=$apiKey"
+            return@withContext "https://www.googleapis.com/drive/v3/files/$fileId?alt=media&key=$apiKey&supportsAllDrives=true"
         }
         val initialUrl = "https://drive.google.com/uc?export=download&id=$fileId"
         val request = Request.Builder()
@@ -241,7 +262,7 @@ object GoogleDriveClient {
     }
 
     private fun fetchFolderContentsViaApi(folderId: String, apiKey: String): List<DriveFile> {
-        val url = "https://www.googleapis.com/drive/v3/files?q='$folderId'+in+parents+and+trashed=false&fields=files(id,name,mimeType,size,thumbnailLink)&pageSize=1000&key=$apiKey"
+        val url = "https://www.googleapis.com/drive/v3/files?q='$folderId'+in+parents+and+trashed=false&fields=files(id,name,mimeType,size,thumbnailLink)&pageSize=1000&key=$apiKey&supportsAllDrives=true&includeItemsFromAllDrives=true"
         val request = Request.Builder()
             .url(url)
             .build()
@@ -496,7 +517,7 @@ object GoogleDriveClient {
     // G2 Fix: Made private — external callers must use fetchFolderContents() which
     // handles demo data, sorting, and dispatches to the correct auth method.
     private fun fetchFolderContentsViaOAuth(folderId: String, accessToken: String): List<DriveFile> {
-        val url = "https://www.googleapis.com/drive/v3/files?q='$folderId'+in+parents+and+trashed=false&fields=files(id,name,mimeType,size,thumbnailLink)&pageSize=1000"
+        val url = "https://www.googleapis.com/drive/v3/files?q='$folderId'+in+parents+and+trashed=false&fields=files(id,name,mimeType,size,thumbnailLink)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true"
         val request = Request.Builder()
             .url(url)
             .header("Authorization", "Bearer $accessToken")
@@ -543,8 +564,8 @@ object GoogleDriveClient {
         }
     }
 
-    const val DEFAULT_CLIENT_ID = "821664604982-l8soddku3m2emdqfvv743" + "js08g9emdpb.apps.googleusercontent.com"
-    const val DEFAULT_CLIENT_SECRET = "GOCSPX-cJHHY0" + "o_AWGVsNVIsAjcD5XKdOs5"
+    const val DEFAULT_CLIENT_ID = "821664604982-hvftoiuk900rj3cald8kdlucd" + "oprf72h.apps.googleusercontent.com"
+    const val DEFAULT_CLIENT_SECRET = "GOCSPX-CMeNgvXuE0F32Lmu_0" + "VnVvMcYGJH"
 
     // Option 2 Credentials
     const val DEFAULT_CLIENT_ID_2 = "859382304635-3djbp5sbiflkq9b07jr17qpr" + "812d10u5.apps.googleusercontent.com"
