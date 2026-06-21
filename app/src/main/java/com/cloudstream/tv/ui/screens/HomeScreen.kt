@@ -1035,15 +1035,6 @@ fun AddFolderOverlay(
                                         isVerifying = true
                                         scope.launch {
                                             try {
-                                                val isPublic = withContext(Dispatchers.IO) {
-                                                    GoogleDriveClient.isFolderPublic(folderId)
-                                                }
-                                                if (!isPublic) {
-                                                    errorMsg = "Your folder is not public. Please share the folder as 'Anyone with the link' (Viewer) and try again."
-                                                    isVerifying = false
-                                                    return@launch
-                                                }
-
                                                 val isValid = withContext(Dispatchers.IO) {
                                                     val oauthToken = repository.getAccessToken()
                                                     GoogleDriveClient.validateFolder(folderId, repository.getApiKey(), oauthToken)
@@ -1064,7 +1055,13 @@ fun AddFolderOverlay(
                                                         isVerifying = false
                                                         onShowNetworkDialog(performValidation!!)
                                                     } else {
-                                                        errorMsg = "Verification failed. Link is private or inaccessible."
+                                                        errorMsg = if (repository.isLoggedIn()) {
+                                                            "Could not access folder. Verify folder ID and access permissions."
+                                                        } else if (repository.getApiKey().isNullOrBlank()) {
+                                                            "Could not access folder. Verify that anyone with the link can view it, or login with Google."
+                                                        } else {
+                                                            "Could not access folder. Verify folder ID and API Key."
+                                                        }
                                                         isVerifying = false
                                                     }
                                                 }

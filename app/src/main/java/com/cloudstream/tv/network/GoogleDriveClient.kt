@@ -77,6 +77,7 @@ object GoogleDriveClient {
                             Log.w(TAG, "Resource is not a folder: $folderId, mimeType: $mimeType")
                             return@withContext false
                         }
+                        return@withContext true
                     } else {
                         Log.e(TAG, "Resource check failed with HTTP ${response.code}")
                         return@withContext false
@@ -96,14 +97,17 @@ object GoogleDriveClient {
                             Log.w(TAG, "Resource is not a folder: $folderId, mimeType: $mimeType")
                             return@withContext false
                         }
+                        return@withContext true
                     } else {
                         Log.e(TAG, "Resource check failed with HTTP ${response.code}")
                         return@withContext false
                     }
                 }
+            } else {
+                // Anonymous access (no OAuth token, no API key).
+                // The folder must be public.
+                return@withContext isFolderPublic(folderId)
             }
-            // mimeType check passed — folder is valid and accessible
-            true
         } catch (e: Exception) {
             Log.e(TAG, "Validation failed for folder $folderId", e)
             false
