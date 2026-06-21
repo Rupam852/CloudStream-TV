@@ -887,12 +887,19 @@ fun HomeScreen(
                 AddFolderOverlay(
                     repository = repository,
                     onDismiss = { showAddFolderDialog = false },
-                    onFolderAdded = {
+                    onFolderAdded = { newFolderId ->
+                        // Close dialog first to avoid recomposition conflicts
+                        showAddFolderDialog = false
+                        // Refresh folder list in sidebar
                         savedFolders.clear()
                         savedFolders.addAll(repository.getSavedLinks())
-                        selectedFolderId = repository.getLastSelectedFolderId()
-                        currentFolderId = selectedFolderId
-                        showAddFolderDialog = false
+                        selectedFolderId = newFolderId
+                        currentFolderId = newFolderId
+                        // Directly trigger loadFolder — do NOT rely on LaunchedEffect(currentFolderId)
+                        // because if currentFolderId was already the same value, the effect won't re-run.
+                        coroutineScope.launch {
+                            loadFolder(newFolderId)
+                        }
                     },
                     onShowNetworkDialog = { action ->
                         pendingNetworkAction = action
@@ -953,7 +960,7 @@ fun HomeScreen(
 fun AddFolderOverlay(
     repository: DriveRepository,
     onDismiss: () -> Unit,
-    onFolderAdded: () -> Unit,
+    onFolderAdded: (folderId: String) -> Unit,
     onShowNetworkDialog: (() -> Unit) -> Unit
 ) {
     Dialog(
@@ -1081,7 +1088,7 @@ fun AddFolderOverlay(
                                                     repository.setLastSelectedFolderId(folderId)
                                                     isVerifying = false
                                                     Toast.makeText(context, "Folder added successfully!", Toast.LENGTH_SHORT).show()
-                                                    onFolderAdded()
+                                                    onFolderAdded(folderId)
                                                 } else {
                                                     if (!NetworkUtils.isInternetAvailable(context)) {
                                                         isVerifying = false
