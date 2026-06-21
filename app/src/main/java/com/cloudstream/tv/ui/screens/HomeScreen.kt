@@ -270,7 +270,8 @@ fun HomeScreen(
 
 
     var showExitDialog by remember { mutableStateOf(false) }
-    val isOverlayActive = showAddFolderDialog || showExitDialog || (folderOptionsActiveFolder != null)
+    var showLogoutDialog by remember { mutableStateOf(false) }
+    val isOverlayActive = showAddFolderDialog || showExitDialog || showLogoutDialog || (folderOptionsActiveFolder != null)
 
     // Handle physical TV Back Button
     BackHandler(enabled = !isOverlayActive) {
@@ -866,16 +867,7 @@ fun HomeScreen(
                         icon = Icons.AutoMirrored.Filled.ExitToApp,
                         isSelected = false,
                         onSelect = {
-                            // Reset credentials
-                            repository.clearOAuthTokens()
-                            repository.setApiKey(null)
-                            // Delete all saved links
-                            repository.getSavedLinks().forEach { repository.deleteLink(it.id) }
-                            // Clear history
-                            repository.clearRecentlyViewed()
-                            // Navigate to welcome onboarding screen
-                            onNavigateToOnboarding()
-                            Toast.makeText(context, "Logged out and reset successfully!", Toast.LENGTH_SHORT).show()
+                            showLogoutDialog = true
                         },
                         isExpanded = isSidebarExpanded
                     )
@@ -911,6 +903,25 @@ fun HomeScreen(
             if (showExitDialog) {
                 ExitDialogOverlay(
                     onDismiss = { showExitDialog = false }
+                )
+            }
+
+            if (showLogoutDialog) {
+                LogoutConfirmationOverlay(
+                    onDismiss = { showLogoutDialog = false },
+                    onConfirm = {
+                        showLogoutDialog = false
+                        // Reset credentials
+                        repository.clearOAuthTokens()
+                        repository.setApiKey(null)
+                        // Delete all saved links
+                        repository.getSavedLinks().forEach { repository.deleteLink(it.id) }
+                        // Clear history
+                        repository.clearRecentlyViewed()
+                        // Navigate to welcome onboarding screen
+                        onNavigateToOnboarding()
+                        Toast.makeText(context, "Logged out and reset successfully!", Toast.LENGTH_SHORT).show()
+                    }
                 )
             }
 
@@ -1662,6 +1673,114 @@ fun ExitDialogOverlay(
                         ) {
                             Text(
                                 text = "Cancel",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+fun LogoutConfirmationOverlay(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnClickOutside = false
+        )
+    ) {
+        val cancelFocusRequester = remember { FocusRequester() }
+
+        LaunchedEffect(Unit) {
+            cancelFocusRequester.requestFocus()
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.8f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(380.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Logout & Reset",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Are you sure you want to logout? This will clear all credentials and delete all saved links.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TVFocusableItem(
+                        onClick = onConfirm,
+                        shape = RoundedCornerShape(8.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .width(130.dp)
+                                .background(
+                                    if (isFocused) MaterialTheme.colorScheme.error
+                                    else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Yes, Logout",
+                                color = if (isFocused) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    TVFocusableItem(
+                        onClick = onDismiss,
+                        modifier = Modifier.focusRequester(cancelFocusRequester),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { isFocused ->
+                        Box(
+                            modifier = Modifier
+                                .width(130.dp)
+                                .background(
+                                    if (isFocused) MaterialTheme.colorScheme.surfaceVariant
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No, Cancel",
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.labelLarge
