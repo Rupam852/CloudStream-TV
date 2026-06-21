@@ -3,9 +3,9 @@ package com.cloudstream.tv.data
 import java.io.Serializable
 
 data class DriveFile(
-    val id: String,
-    val name: String,
-    val mimeType: String,
+    val id: String = "",
+    val name: String = "",
+    val mimeType: String = "",
     val size: Long? = null,
     val isFolder: Boolean = false,
     val thumbnailUrl: String? = null,

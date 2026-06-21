@@ -37,6 +37,7 @@ class DriveRepository(context: Context) {
             val type = object : TypeToken<List<DriveLink>>() {}.type
             gson.fromJson(json, type) ?: emptyList()
         } catch (e: Exception) {
+            android.util.Log.e("DriveRepository", "Failed to deserialize saved links. JSON: $json", e)
             emptyList()
         }
     }

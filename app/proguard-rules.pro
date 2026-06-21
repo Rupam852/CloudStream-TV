@@ -37,6 +37,13 @@
 -keep class com.cloudstream.tv.data.** { *; }
 -dontwarn com.google.gson.**
 
+# Prevent obfuscating generic type tokens and signatures
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
+-keepclassmembers class * extends com.google.gson.reflect.TypeToken {
+    <init>(...);
+}
+
 # ─── Coil ────────────────────────────────────────────────────────────────
 -keep class coil.** { *; }
 -dontwarn coil.**
