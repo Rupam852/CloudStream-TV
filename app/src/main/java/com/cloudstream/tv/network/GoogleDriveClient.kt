@@ -536,7 +536,7 @@ object GoogleDriveClient {
                 } catch (e: Exception) {
                     errorBody
                 }
-                throw IOException("Google API error: $errorMessage")
+                throw IOException("Google API error HTTP ${response.code}: $errorMessage")
             }
             val bodyString = response.body?.string() ?: throw IOException("Empty response body")
             val gson = Gson()

@@ -175,7 +175,8 @@ fun HomeScreen(
                 val isLoggedIn = repository.isLoggedIn()
                 val token = repository.getAccessToken()
                 if (isLoggedIn && token.isNullOrBlank()) {
-                    throw java.io.IOException("Google session expired or TV is offline. Please check your network connection.")
+                    // Token fetch failed — likely a network/backend issue, not a Drive error
+                    throw java.io.IOException("Could not get access token. Check your connection.")
                 }
                 GoogleDriveClient.fetchFolderContents(folderId, repository.getApiKey(), token)
             }
@@ -184,18 +185,33 @@ fun HomeScreen(
             if (e is kotlinx.coroutines.CancellationException) {
                 throw e
             }
-            if (e is java.io.IOException || !NetworkUtils.isInternetAvailable(context)) {
+            val isGoogleApiError = e is java.io.IOException &&
+                (e.message?.contains("Google API error") == true ||
+                 e.message?.contains("HTTP 4") == true)
+            val isRealNetworkError = !NetworkUtils.isInternetAvailable(context) ||
+                (e is java.io.IOException && !isGoogleApiError)
+
+            if (isRealNetworkError) {
+                // True network connectivity issue — show network dialog with retry
+                loadingError = "Network error. Check your connection and tap Retry."
                 pendingNetworkAction = {
                     coroutineScope.launch {
                         loadFolder(folderId)
                     }
                 }
                 showNetworkDialog = true
-                // BUG-04 Fix: Only set loadingError when NOT showing the network dialog.
-                // Previously loadingError was always set, causing the error text to show
-                // underneath or after the dialog dismiss even during a retry flow.
             } else {
-                loadingError = "Failed to load files: ${e.localizedMessage}"
+                // Google API or permission error — show inline error with retry button
+                loadingError = when {
+                    e.message?.contains("401") == true || e.message?.contains("403") == true ->
+                        "Access denied. Your Google session may have expired. Please logout and login again."
+                    e.message?.contains("404") == true ->
+                        "Folder not found. It may have been deleted or moved."
+                    e.message?.contains("Google API error") == true ->
+                        "Google Drive error: ${e.localizedMessage}"
+                    else ->
+                        "Failed to load folder: ${e.localizedMessage}"
+                }
             }
             filesList = emptyList()
         } finally {
@@ -485,9 +501,25 @@ fun HomeScreen(
                                     style = MaterialTheme.typography.titleLarge,
                                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
                                 )
+                                if (repository.isLoggedIn()) {
+                                    Text(
+                                        text = "You are logged in. Add any folder from your Google Drive.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                                        modifier = androidx.compose.ui.Modifier.padding(top = 4.dp, bottom = 12.dp)
+                                    )
+                                }
                                 Spacer(modifier = Modifier.height(16.dp))
                                 TVFocusableItem(
-                                    onClick = { onNavigateToOnboarding() },
+                                    onClick = {
+                                        if (repository.isLoggedIn()) {
+                                            // Logged in: show the AddFolderOverlay directly (uses OAuth)
+                                            showAddFolderDialog = true
+                                        } else {
+                                            // Not logged in: go to onboarding to authenticate first
+                                            onNavigateToOnboarding()
+                                        }
+                                    },
                                     modifier = Modifier.focusRequester(contentFocusRequester),
                                     shape = RoundedCornerShape(20.dp)
                                 ) { isFocused ->
@@ -501,7 +533,7 @@ fun HomeScreen(
                                             .padding(horizontal = 24.dp, vertical = 12.dp)
                                     ) {
                                         Text(
-                                            text = "Link Google Drive Folder",
+                                            text = if (repository.isLoggedIn()) "Add Google Drive Folder" else "Login & Link Google Drive Folder",
                                             color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                                             fontWeight = FontWeight.Bold
                                         )
