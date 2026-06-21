@@ -91,6 +91,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+enum class ControlsFocusTarget {
+    PlayPause,
+    SeekBar
+}
+
 @OptIn(UnstableApi::class)
 @SuppressLint("UnsafeOptInUsageError")
 @Composable
@@ -158,15 +163,27 @@ fun PlaybackScreen(
 
     // Initialize ExoPlayer
     val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            playWhenReady = true
-            // Set audio attributes to optimize for TV movie playback
-            val attributes = androidx.media3.common.AudioAttributes.Builder()
-                .setUsage(androidx.media3.common.C.USAGE_MEDIA)
-                .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
-                .build()
-            setAudioAttributes(attributes, true)
-        }
+        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                15_000, // minBufferMs
+                50_000, // maxBufferMs
+                500,    // bufferForPlaybackMs
+                1000    // bufferForPlaybackAfterRebufferMs
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
+        ExoPlayer.Builder(context)
+            .setLoadControl(loadControl)
+            .build().apply {
+                playWhenReady = true
+                // Set audio attributes to optimize for TV movie playback
+                val attributes = androidx.media3.common.AudioAttributes.Builder()
+                    .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+                    .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build()
+                setAudioAttributes(attributes, true)
+            }
     }
 
     // Monitor audio session ID changes via Player.Listener (onAudioSessionIdChanged).
@@ -221,6 +238,7 @@ fun PlaybackScreen(
 
     var controlsVisible by remember { mutableStateOf(true) }
     var userActivityTrigger by remember { mutableStateOf(0L) }
+    var pendingFocusTarget by remember { mutableStateOf(ControlsFocusTarget.PlayPause) }
 
     var resizeMode by remember { mutableStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
     var playbackSpeed by remember { mutableStateOf(1.0f) }
@@ -571,11 +589,17 @@ fun PlaybackScreen(
         if (controlsVisible) {
             delay(450)
             try {
-                playButtonFocusRequester.requestFocus()
+                if (pendingFocusTarget == ControlsFocusTarget.SeekBar) {
+                    timelineFocusRequester.requestFocus()
+                } else {
+                    playButtonFocusRequester.requestFocus()
+                }
             } catch (e: Exception) {
                 // Composable may not be attached yet; safe to ignore
                 Log.w("PlaybackScreen", "Focus request failed (controls not yet attached): ${e.message}")
             }
+        } else {
+            pendingFocusTarget = ControlsFocusTarget.PlayPause
         }
     }
 
@@ -680,8 +704,18 @@ fun PlaybackScreen(
                     val wasVisible = controlsVisible
                     showControls()
                     when (keyEvent.nativeKeyEvent.keyCode) {
+                        KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                            if (!wasVisible) {
+                                pendingFocusTarget = ControlsFocusTarget.PlayPause
+                                showControls()
+                                true
+                            } else {
+                                false
+                            }
+                        }
                         KeyEvent.KEYCODE_DPAD_LEFT -> {
                             if (!wasVisible) {
+                                pendingFocusTarget = ControlsFocusTarget.SeekBar
                                 seekRewind()
                                 true
                             } else {
@@ -690,6 +724,7 @@ fun PlaybackScreen(
                         }
                         KeyEvent.KEYCODE_DPAD_RIGHT -> {
                             if (!wasVisible) {
+                                pendingFocusTarget = ControlsFocusTarget.SeekBar
                                 seekForward()
                                 true
                             } else {
@@ -839,13 +874,34 @@ fun PlaybackScreen(
                         modifier = Modifier
                             .focusRequester(timelineFocusRequester)
                             .focusProperties { down = playButtonFocusRequester }
+                            .onPreviewKeyEvent { keyEvent ->
+                                if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN &&
+                                    keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_UP
+                                ) {
+                                    controlsVisible = false
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // Buttons Row
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onPreviewKeyEvent { keyEvent ->
+                                if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN &&
+                                    keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_DOWN
+                                ) {
+                                    controlsVisible = false
+                                    true
+                                } else {
+                                    false
+                                }
+                            },
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
