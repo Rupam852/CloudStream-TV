@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Activate CloudStream TV</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -386,53 +389,71 @@
             }
         }
 
-        // Check for URL status parameters safely
-        let status = null;
-        let name = null;
-        let message = null;
-        try {
-            const params = new URLSearchParams(window.location.search);
-            status = params.get('status');
-            name = safeDecode(params.get('name'));
-            message = safeDecode(params.get('message'));
-        } catch (e) {
-            console.error("Failed to parse URL search parameters:", e);
-        }
-
-        const activationCard = document.getElementById('activation-card');
-        const successCard = document.getElementById('success-card');
-        const errorCard = document.getElementById('error-card');
-
         // Route to the appropriate screen with safety blocks
-        try {
-            if (status === 'success') {
-                document.body.classList.add('success-glow');
-                if (activationCard) activationCard.style.display = 'none';
-                if (successCard) {
-                    successCard.style.display = 'block';
-                    if (name) {
-                        const userNameEl = document.getElementById('success-user-name');
-                        if (userNameEl) userNameEl.textContent = name;
+        function initPage() {
+            // Check for URL status parameters safely
+            let status = null;
+            let name = null;
+            let message = null;
+            try {
+                const params = new URLSearchParams(window.location.search);
+                status = params.get('status');
+                name = safeDecode(params.get('name'));
+                message = safeDecode(params.get('message'));
+            } catch (e) {
+                console.error("Failed to parse URL search parameters:", e);
+            }
+
+            const activationCard = document.getElementById('activation-card');
+            const successCard = document.getElementById('success-card');
+            const errorCard = document.getElementById('error-card');
+
+            try {
+                if (status === 'success') {
+                    document.body.classList.add('success-glow');
+                    document.body.classList.remove('error-glow');
+                    if (activationCard) activationCard.style.display = 'none';
+                    if (errorCard) errorCard.style.display = 'none';
+                    if (successCard) {
+                        successCard.style.display = 'block';
+                        if (name) {
+                            const userNameEl = document.getElementById('success-user-name');
+                            if (userNameEl) userNameEl.textContent = name;
+                        }
                     }
-                }
-            } else if (status === 'error') {
-                document.body.classList.add('error-glow');
-                if (activationCard) activationCard.style.display = 'none';
-                if (errorCard) {
-                    errorCard.style.display = 'block';
-                    if (message) {
-                        const errMsgEl = document.getElementById('error-message-text');
-                        if (errMsgEl) errMsgEl.textContent = message;
+                } else if (status === 'error') {
+                    document.body.classList.add('error-glow');
+                    document.body.classList.remove('success-glow');
+                    if (activationCard) activationCard.style.display = 'none';
+                    if (successCard) successCard.style.display = 'none';
+                    if (errorCard) {
+                        errorCard.style.display = 'block';
+                        if (message) {
+                            const errMsgEl = document.getElementById('error-message-text');
+                            if (errMsgEl) errMsgEl.textContent = message;
+                        }
                     }
+                } else {
+                    document.body.classList.remove('success-glow', 'error-glow');
+                    if (successCard) successCard.style.display = 'none';
+                    if (errorCard) errorCard.style.display = 'none';
+                    if (activationCard) activationCard.style.display = 'block';
                 }
-            } else {
+            } catch (e) {
+                console.error("UI rendering failed:", e);
+                // Fallback: make sure at least the activation card is shown in case of crash
                 if (activationCard) activationCard.style.display = 'block';
             }
-        } catch (e) {
-            console.error("UI rendering failed:", e);
-            // Fallback: make sure at least the activation card is shown in case of crash
-            if (activationCard) activationCard.style.display = 'block';
         }
+
+        // Run immediately
+        initPage();
+
+        // Run when DOM is fully parsed
+        document.addEventListener('DOMContentLoaded', initPage);
+
+        // Run when page is shown, including back/forward history cache loads
+        window.addEventListener('pageshow', initPage);
 
         // Input handler for code entry
         const codeInput = document.getElementById('session-code');
