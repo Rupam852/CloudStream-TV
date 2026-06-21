@@ -270,6 +270,21 @@
     </div>
 
     <script>
+        // Force a one-time reload per unique login attempt to guarantee mobile browser rendering
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const tParam = params.get('t');
+            if (tParam) {
+                const lastReloadedT = sessionStorage.getItem('last_reloaded_t');
+                if (lastReloadedT !== tParam) {
+                    sessionStorage.setItem('last_reloaded_t', tParam);
+                    window.location.reload();
+                }
+            }
+        } catch (e) {
+            console.error("Failed to execute auto-reload check:", e);
+        }
+
         // Safe URL parameter decoding helper
         function safeDecode(val) {
             if (!val) return "";
