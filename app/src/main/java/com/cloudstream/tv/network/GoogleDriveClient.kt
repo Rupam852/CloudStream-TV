@@ -266,7 +266,17 @@ object GoogleDriveClient {
     }
 
     private fun fetchFolderContentsViaApi(folderId: String, apiKey: String): List<DriveFile> {
-        val url = "https://www.googleapis.com/drive/v3/files?q='$folderId'+in+parents+and+trashed=false&fields=files(id,name,mimeType,size,thumbnailLink)&pageSize=1000&key=$apiKey&supportsAllDrives=true&includeItemsFromAllDrives=true"
+        val url = okhttp3.HttpUrl.Builder()
+            .scheme("https")
+            .host("www.googleapis.com")
+            .addPathSegments("drive/v3/files")
+            .addQueryParameter("q", "'$folderId' in parents and trashed=false")
+            .addQueryParameter("fields", "files(id,name,mimeType,size,thumbnailLink)")
+            .addQueryParameter("pageSize", "1000")
+            .addQueryParameter("key", apiKey)
+            .addQueryParameter("supportsAllDrives", "true")
+            .addQueryParameter("includeItemsFromAllDrives", "true")
+            .build()
         val request = Request.Builder()
             .url(url)
             .build()
@@ -290,11 +300,11 @@ object GoogleDriveClient {
             val result = mutableListOf<DriveFile>()
             for (element in filesArray) {
                 val obj = element.asJsonObject
-                val id = obj.get("id").asString
-                val name = obj.get("name").asString
-                val mimeType = obj.get("mimeType").asString
-                val size = if (obj.has("size")) obj.get("size").asLong else null
-                val thumbnailLink = if (obj.has("thumbnailLink")) obj.get("thumbnailLink").asString else null
+                val id = obj.get("id")?.asString ?: continue
+                val name = obj.get("name")?.asString ?: "Untitled"
+                val mimeType = obj.get("mimeType")?.asString ?: "application/octet-stream"
+                val size = if (obj.has("size") && !obj.get("size").isJsonNull) obj.get("size").asLong else null
+                val thumbnailLink = if (obj.has("thumbnailLink") && !obj.get("thumbnailLink").isJsonNull) obj.get("thumbnailLink").asString else null
                 
                 val isFolder = mimeType == "application/vnd.google-apps.folder"
                 result.add(
@@ -521,7 +531,16 @@ object GoogleDriveClient {
     // G2 Fix: Made private — external callers must use fetchFolderContents() which
     // handles demo data, sorting, and dispatches to the correct auth method.
     private fun fetchFolderContentsViaOAuth(folderId: String, accessToken: String): List<DriveFile> {
-        val url = "https://www.googleapis.com/drive/v3/files?q='$folderId'+in+parents+and+trashed=false&fields=files(id,name,mimeType,size,thumbnailLink)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true"
+        val url = okhttp3.HttpUrl.Builder()
+            .scheme("https")
+            .host("www.googleapis.com")
+            .addPathSegments("drive/v3/files")
+            .addQueryParameter("q", "'$folderId' in parents and trashed=false")
+            .addQueryParameter("fields", "files(id,name,mimeType,size,thumbnailLink)")
+            .addQueryParameter("pageSize", "1000")
+            .addQueryParameter("supportsAllDrives", "true")
+            .addQueryParameter("includeItemsFromAllDrives", "true")
+            .build()
         val request = Request.Builder()
             .url(url)
             .header("Authorization", "Bearer $accessToken")
@@ -546,11 +565,11 @@ object GoogleDriveClient {
             val result = mutableListOf<DriveFile>()
             for (element in filesArray) {
                 val obj = element.asJsonObject
-                val id = obj.get("id").asString
-                val name = obj.get("name").asString
-                val mimeType = obj.get("mimeType").asString
-                val size = if (obj.has("size")) obj.get("size").asLong else null
-                val thumbnailLink = if (obj.has("thumbnailLink")) obj.get("thumbnailLink").asString else null
+                val id = obj.get("id")?.asString ?: continue
+                val name = obj.get("name")?.asString ?: "Untitled"
+                val mimeType = obj.get("mimeType")?.asString ?: "application/octet-stream"
+                val size = if (obj.has("size") && !obj.get("size").isJsonNull) obj.get("size").asLong else null
+                val thumbnailLink = if (obj.has("thumbnailLink") && !obj.get("thumbnailLink").isJsonNull) obj.get("thumbnailLink").asString else null
                 
                 val isFolder = mimeType == "application/vnd.google-apps.folder"
                 result.add(
