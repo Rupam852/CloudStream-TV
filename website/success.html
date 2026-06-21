@@ -309,8 +309,7 @@
                             if (userNameEl) userNameEl.textContent = name;
                         }
                     }
-                } else {
-                    // Default to error card if status is missing or set to error
+                } else if (status === 'error') {
                     document.body.classList.add('error-glow');
                     document.body.classList.remove('success-glow');
                     if (successCard) successCard.style.display = 'none';
@@ -321,6 +320,9 @@
                             if (errMsgEl) errMsgEl.textContent = message;
                         }
                     }
+                } else {
+                    // No status param (e.g. direct access) - redirect to code entry page
+                    window.location.href = '/authenticate';
                 }
             } catch (e) {
                 console.error("UI rendering failed:", e);
