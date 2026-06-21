@@ -165,10 +165,14 @@ fun PlaybackScreen(
     val exoPlayer = remember {
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                15_000, // minBufferMs
+                50_000, // minBufferMs
                 50_000, // maxBufferMs
-                500,    // bufferForPlaybackMs
-                1000    // bufferForPlaybackAfterRebufferMs
+                2_000,  // bufferForPlaybackMs
+                2_500   // bufferForPlaybackAfterRebufferMs
+            )
+            .setBackBuffer(
+                15_000, // backBufferDurationMs
+                true    // retainBackBufferFromKeyframe
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
