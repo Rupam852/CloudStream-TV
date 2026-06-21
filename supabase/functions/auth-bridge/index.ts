@@ -58,7 +58,7 @@ serve(async (req) => {
     if (path === '/login' || path === '/api/login') {
       const sessionId = url.searchParams.get('session')?.trim().toUpperCase();
       if (!sessionId) {
-        return Response.redirect('https://cloudstream-tv.vercel.app/authenticate.html?status=error&message=Missing%20session%20parameter%20in%20the%20URL.%20Please%20scan%20the%20QR%20code%20or%20enter%20the%20code%20manually.', 302);
+        return Response.redirect('https://cloudstream-tv.vercel.app/authenticate?status=error&message=Missing%20session%20parameter%20in%20the%20URL.%20Please%20scan%20the%20QR%20code%20or%20enter%20the%20code%20manually.', 302);
       }
 
       const { data: session, error } = await supabase
@@ -68,7 +68,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (error || !session) {
-        return Response.redirect('https://cloudstream-tv.vercel.app/authenticate.html?status=error&message=This%20login%20session%20is%20invalid%20or%20has%20expired.%20Please%20close%20the%20login%20screen%20on%20your%20TV%20and%20open%20it%20again.', 302);
+        return Response.redirect('https://cloudstream-tv.vercel.app/authenticate?status=error&message=This%20login%20session%20is%20invalid%20or%20has%20expired.%20Please%20close%20the%20login%20screen%20on%20your%20TV%20and%20open%20it%20again.', 302);
       }
 
       const useOpt2 = session.opt === '2';
@@ -102,7 +102,7 @@ serve(async (req) => {
       const stateStr = url.searchParams.get('state')?.trim() || '';
 
       if (!code || !stateStr) {
-        return Response.redirect('https://cloudstream-tv.vercel.app/authenticate.html?status=error&message=Missing%20authorization%20code%20or%20state%20from%20Google.%20Please%20try%20logging%20in%20again.', 302);
+        return Response.redirect('https://cloudstream-tv.vercel.app/authenticate?status=error&message=Missing%20authorization%20code%20or%20state%20from%20Google.%20Please%20try%20logging%20in%20again.', 302);
       }
 
       const parts = stateStr.split(':');
@@ -116,7 +116,7 @@ serve(async (req) => {
         .maybeSingle();
 
       if (error || !session) {
-        return Response.redirect('https://cloudstream-tv.vercel.app/authenticate.html?status=error&message=This%20login%20session%20has%20expired%20or%20is%20invalid.%20Please%20close%20the%20login%20screen%20on%20your%20TV%20and%20open%20it%20again.', 302);
+        return Response.redirect('https://cloudstream-tv.vercel.app/authenticate?status=error&message=This%20login%20session%20has%20expired%20or%20is%20invalid.%20Please%20close%20the%20login%20screen%20on%20your%20TV%20and%20open%20it%20again.', 302);
       }
 
       const useOpt2 = session.opt === '2';
@@ -226,7 +226,7 @@ serve(async (req) => {
       }).eq('id', sessionId);
 
       const encodedName = encodeURIComponent(name || 'User');
-      return Response.redirect(`https://cloudstream-tv.vercel.app/authenticate.html?status=success&name=${encodedName}`, 302);
+      return Response.redirect(`https://cloudstream-tv.vercel.app/authenticate?status=success&name=${encodedName}`, 302);
     }
 
     // 4. Polling endpoint for Android TV client
