@@ -437,7 +437,27 @@
                     document.body.classList.remove('success-glow', 'error-glow');
                     if (successCard) successCard.style.display = 'none';
                     if (errorCard) errorCard.style.display = 'none';
-                    if (activationCard) activationCard.style.display = 'block';
+                    if (activationCard) {
+                        activationCard.style.display = 'block';
+                        // Reset input and submit button states for bfcache compatibility
+                        const inputEl = document.getElementById('session-code');
+                        const submitEl = document.getElementById('submit-btn');
+                        const spinnerEl = document.getElementById('btn-spinner');
+                        const btnTextEl = document.getElementById('btn-text');
+                        if (inputEl) {
+                            inputEl.value = '';
+                            inputEl.disabled = false;
+                        }
+                        if (submitEl) {
+                            submitEl.disabled = true;
+                        }
+                        if (spinnerEl) {
+                            spinnerEl.style.display = 'none';
+                        }
+                        if (btnTextEl) {
+                            btnTextEl.textContent = 'Sign In with Google';
+                        }
+                    }
                 }
             } catch (e) {
                 console.error("UI rendering failed:", e);
