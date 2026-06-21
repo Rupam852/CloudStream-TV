@@ -375,33 +375,63 @@
     </div>
 
     <script>
-        // Check for URL status parameters
-        const params = new URLSearchParams(window.location.search);
-        const status = params.get('status');
-        const name = params.get('name');
-        const message = params.get('message');
+        // Safe URL parameter decoding helper
+        function safeDecode(val) {
+            if (!val) return "";
+            try {
+                return decodeURIComponent(val.replace(/\+/g, ' '));
+            } catch (e) {
+                console.error("Decoding failed for value:", val, e);
+                return val; // Fallback to raw value if decoding throws URIError
+            }
+        }
+
+        // Check for URL status parameters safely
+        let status = null;
+        let name = null;
+        let message = null;
+        try {
+            const params = new URLSearchParams(window.location.search);
+            status = params.get('status');
+            name = safeDecode(params.get('name'));
+            message = safeDecode(params.get('message'));
+        } catch (e) {
+            console.error("Failed to parse URL search parameters:", e);
+        }
 
         const activationCard = document.getElementById('activation-card');
         const successCard = document.getElementById('success-card');
         const errorCard = document.getElementById('error-card');
 
-        // Route to the appropriate screen
-        if (status === 'success') {
-            document.body.classList.add('success-glow');
-            activationCard.style.display = 'none';
-            successCard.style.display = 'block';
-            if (name) {
-                document.getElementById('success-user-name').textContent = decodeURIComponent(name);
+        // Route to the appropriate screen with safety blocks
+        try {
+            if (status === 'success') {
+                document.body.classList.add('success-glow');
+                if (activationCard) activationCard.style.display = 'none';
+                if (successCard) {
+                    successCard.style.display = 'block';
+                    if (name) {
+                        const userNameEl = document.getElementById('success-user-name');
+                        if (userNameEl) userNameEl.textContent = name;
+                    }
+                }
+            } else if (status === 'error') {
+                document.body.classList.add('error-glow');
+                if (activationCard) activationCard.style.display = 'none';
+                if (errorCard) {
+                    errorCard.style.display = 'block';
+                    if (message) {
+                        const errMsgEl = document.getElementById('error-message-text');
+                        if (errMsgEl) errMsgEl.textContent = message;
+                    }
+                }
+            } else {
+                if (activationCard) activationCard.style.display = 'block';
             }
-        } else if (status === 'error') {
-            document.body.classList.add('error-glow');
-            activationCard.style.display = 'none';
-            errorCard.style.display = 'block';
-            if (message) {
-                document.getElementById('error-message-text').textContent = decodeURIComponent(message);
-            }
-        } else {
-            activationCard.style.display = 'block';
+        } catch (e) {
+            console.error("UI rendering failed:", e);
+            // Fallback: make sure at least the activation card is shown in case of crash
+            if (activationCard) activationCard.style.display = 'block';
         }
 
         // Input handler for code entry
