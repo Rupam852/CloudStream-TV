@@ -82,10 +82,12 @@ fun OnboardingScreen(
     val nameFocusRequester = remember { FocusRequester() }
     val validateFocusRequester = remember { FocusRequester() }
 
-    // Auto-focus input on launch
+    // Auto-focus input on launch safely
     LaunchedEffect(Unit) {
         delay(500)
-        inputFocusRequester.requestFocus()
+        try {
+            inputFocusRequester.requestFocus()
+        } catch (_: Exception) {}
     }
 
     fun startValidation(url: String, customName: String) {

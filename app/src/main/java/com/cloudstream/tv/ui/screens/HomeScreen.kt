@@ -1262,9 +1262,12 @@ fun GoogleLoginOverlay(
             }
         }
 
-        // Auto-request focus on the Cancel button when dialog opens
+        // Auto-request focus on the Cancel button when dialog opens safely
         LaunchedEffect(Unit) {
-            cancelFocusRequester.requestFocus()
+            kotlinx.coroutines.delay(200)
+            try {
+                cancelFocusRequester.requestFocus()
+            } catch (_: Exception) {}
         }
 
         Box(
@@ -1620,7 +1623,10 @@ fun ExitDialogOverlay(
         val cancelFocusRequester = remember { FocusRequester() }
 
         LaunchedEffect(Unit) {
-            cancelFocusRequester.requestFocus()
+            kotlinx.coroutines.delay(200)
+            try {
+                cancelFocusRequester.requestFocus()
+            } catch (_: Exception) {}
         }
 
         Box(
@@ -1737,7 +1743,10 @@ fun LogoutConfirmationOverlay(
         val cancelFocusRequester = remember { FocusRequester() }
 
         LaunchedEffect(Unit) {
-            cancelFocusRequester.requestFocus()
+            kotlinx.coroutines.delay(200)
+            try {
+                cancelFocusRequester.requestFocus()
+            } catch (_: Exception) {}
         }
 
         Box(
@@ -1852,7 +1861,9 @@ fun FolderOptionsOverlay(
             // Delay requesting focus to allow the user to release the D-pad Center key
             // that triggered the long press, preventing accidental clicks on the dialog options.
             kotlinx.coroutines.delay(300)
-            focusRequester.requestFocus()
+            try {
+                focusRequester.requestFocus()
+            } catch (_: Exception) {}
         }
 
         Box(
