@@ -1,0 +1,6 @@
+name = "cloudstream-edge-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Workers Free tier provides 100,000 requests/day for streaming proxying.
+# To deploy: npx wrangler deploy

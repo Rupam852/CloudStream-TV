@@ -135,10 +135,27 @@ object GoogleDriveClient {
     }
 
 
-    suspend fun resolveDriveDirectUrl(fileId: String, oauthToken: String? = null, apiKey: String? = null): String = withContext(Dispatchers.IO) {
+    suspend fun resolveDriveDirectUrl(
+        fileId: String,
+        oauthToken: String? = null,
+        apiKey: String? = null,
+        cdnProxyUrl: String? = null
+    ): String = withContext(Dispatchers.IO) {
         if (fileId.startsWith("http")) {
             return@withContext fileId
         }
+
+        // If Cloudflare Worker CDN proxy is configured, route stream through Cloudflare Edge
+        if (!cdnProxyUrl.isNullOrBlank()) {
+            val baseCdn = cdnProxyUrl.trim().trimEnd('/')
+            val endpoint = if (baseCdn.endsWith("/stream")) baseCdn else "$baseCdn/stream"
+            val sb = StringBuilder("$endpoint?fileId=${java.net.URLEncoder.encode(fileId, "UTF-8")}")
+            if (!apiKey.isNullOrBlank()) {
+                sb.append("&key=${java.net.URLEncoder.encode(apiKey, "UTF-8")}")
+            }
+            return@withContext sb.toString()
+        }
+
         if (!oauthToken.isNullOrBlank()) {
             return@withContext "https://www.googleapis.com/drive/v3/files/$fileId?alt=media&supportsAllDrives=true"
         }

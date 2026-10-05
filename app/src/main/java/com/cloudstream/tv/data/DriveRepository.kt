@@ -28,6 +28,8 @@ class DriveRepository(context: Context) {
         private const val KEY_OAUTH_CLIENT_SECRET = "oauth_client_secret"
         private const val KEY_WARNING_DISMISSED = "warning_notice_dismissed"
         private const val KEY_PLAYBACK_POSITIONS = "playback_positions"
+        private const val KEY_CDN_PROXY_URL = "cloudflare_cdn_proxy_url"
+        const val DEFAULT_CDN_PROXY_URL = "https://cloudstream-proxy.rupambairagya08.workers.dev"
     }
 
     // --- Saved Folder Links ---
@@ -180,6 +182,18 @@ class DriveRepository(context: Context) {
             prefs.edit().remove(KEY_API_KEY).apply()
         } else {
             prefs.edit().putString(KEY_API_KEY, key.trim()).apply()
+        }
+    }
+
+    fun getCdnProxyUrl(): String? {
+        return prefs.getString(KEY_CDN_PROXY_URL, DEFAULT_CDN_PROXY_URL)
+    }
+
+    fun setCdnProxyUrl(url: String?) {
+        if (url.isNullOrBlank()) {
+            prefs.edit().remove(KEY_CDN_PROXY_URL).apply()
+        } else {
+            prefs.edit().putString(KEY_CDN_PROXY_URL, url.trim()).apply()
         }
     }
 

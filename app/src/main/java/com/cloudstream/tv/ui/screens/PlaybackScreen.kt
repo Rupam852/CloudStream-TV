@@ -4,11 +4,14 @@ import android.annotation.SuppressLint
 import android.view.KeyEvent
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,9 +79,11 @@ import com.cloudstream.tv.data.DriveFile
 import com.cloudstream.tv.data.DriveRepository
 import com.cloudstream.tv.network.GoogleDriveClient
 import com.cloudstream.tv.network.NetworkUtils
+import com.cloudstream.tv.network.VideoCacheManager
 import com.cloudstream.tv.ui.components.ConnectivityDialog
 import com.cloudstream.tv.ui.components.TVFocusableItem
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
@@ -163,16 +168,18 @@ fun PlaybackScreen(
 
     // Initialize ExoPlayer
     val exoPlayer = remember {
+        // ZERO-BUFFERING LOAD CONTROL
+        // Buffers up to 3 minutes ahead in the background and keeps 30 seconds back-buffer for instant rewind.
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                50_000, // minBufferMs
-                50_000, // maxBufferMs
-                2_000,  // bufferForPlaybackMs
-                2_500   // bufferForPlaybackAfterRebufferMs
+                60_000,  // minBufferMs (60s minimum ahead)
+                180_000, // maxBufferMs (3 minutes maximum ahead)
+                1_000,   // bufferForPlaybackMs (instant 1s fast startup)
+                2_000    // bufferForPlaybackAfterRebufferMs (fast 2s rebuffer)
             )
             .setBackBuffer(
-                15_000, // backBufferDurationMs
-                true    // retainBackBufferFromKeyframe
+                30_000,  // backBufferDurationMs (30s rewind kept in RAM/Disk)
+                true     // retainBackBufferFromKeyframe
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
@@ -253,6 +260,9 @@ fun PlaybackScreen(
     // Coroutine scope for debounced seeks
     val coroutineScope = rememberCoroutineScope()
     var seekDebounceJob by remember { mutableStateOf<Job?>(null) }
+    var seekConsecutiveCount by remember { mutableIntStateOf(0) }
+    var lastSeekTimestamp by remember { mutableLongStateOf(0L) }
+    var accumulatedSeekDelta by remember { mutableLongStateOf(0L) }
 
     // Retry counter for auto-recovery on player error (max 2 retries)
     var playerErrorRetryCount by remember { mutableIntStateOf(0) }
@@ -273,9 +283,10 @@ fun PlaybackScreen(
                 null
             }
             val apiKey = repository.getApiKey()
+            val cdnUrl = repository.getCdnProxyUrl()
             oauthToken = token
             val url = withContext(Dispatchers.IO) {
-                GoogleDriveClient.resolveDriveDirectUrl(activeFile.id, token, apiKey)
+                GoogleDriveClient.resolveDriveDirectUrl(activeFile.id, token, apiKey, cdnUrl)
             }
             if (url.isNullOrBlank()) {
                 throw java.io.IOException("Inaccessible or empty video URL")
@@ -317,7 +328,7 @@ fun PlaybackScreen(
     }
 
     // Load active file into player when resolved URL is ready
-    LaunchedEffect(resolvedUrl, oauthToken) {
+    LaunchedEffect(resolvedUrl) {
         val url = resolvedUrl ?: return@LaunchedEffect
         val mediaItem = MediaItem.fromUri(url)
         val token = oauthToken
@@ -329,6 +340,8 @@ fun PlaybackScreen(
         // the exact same request with the new token — completely transparent to the player.
         // This means video NEVER stops for a token expiry, even for 3GB+ 3-hour movies.
         val tokenRefreshingClient = OkHttpClient.Builder()
+            .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
+            .retryOnConnectionFailure(true)
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
@@ -356,18 +369,22 @@ fun PlaybackScreen(
             }
             .build()
 
-        val dataSourceFactory = OkHttpDataSource.Factory(tokenRefreshingClient).apply {
+        val okHttpDataSourceFactory = OkHttpDataSource.Factory(tokenRefreshingClient).apply {
             setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             if (token != null && url.contains("googleapis.com")) {
                 setDefaultRequestProperties(mapOf("Authorization" to "Bearer $token"))
             }
         }
 
+        // Wrap with VideoCacheManager for disk-backed chunk caching & instant seeking
+        val cachedDataSourceFactory = VideoCacheManager.buildCacheDataSourceFactory(context, okHttpDataSourceFactory)
+
         val extractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory().apply {
             setConstantBitrateSeekingEnabled(true)
+            setConstantBitrateSeekingAlwaysEnabled(true)
         }
 
-        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory, extractorsFactory)
+        val mediaSource = ProgressiveMediaSource.Factory(cachedDataSourceFactory, extractorsFactory)
             .createMediaSource(mediaItem)
 
         exoPlayer.setMediaSource(mediaSource)
@@ -408,6 +425,8 @@ fun PlaybackScreen(
                 val url = resolvedUrl ?: break
                 val mediaItem = MediaItem.fromUri(url)
                 val refreshedClient = OkHttpClient.Builder()
+                    .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
+                    .retryOnConnectionFailure(true)
                     .connectTimeout(15, TimeUnit.SECONDS)
                     .readTimeout(30, TimeUnit.SECONDS)
                     .writeTimeout(15, TimeUnit.SECONDS)
@@ -428,9 +447,12 @@ fun PlaybackScreen(
                         setDefaultRequestProperties(mapOf("Authorization" to "Bearer $newToken"))
                     }
                 }
-                val newExtractors = androidx.media3.extractor.DefaultExtractorsFactory()
-                    .apply { setConstantBitrateSeekingEnabled(true) }
-                val newSource = ProgressiveMediaSource.Factory(newFactory, newExtractors)
+                val cachedFactory = VideoCacheManager.buildCacheDataSourceFactory(context, newFactory)
+                val newExtractors = androidx.media3.extractor.DefaultExtractorsFactory().apply {
+                    setConstantBitrateSeekingEnabled(true)
+                    setConstantBitrateSeekingAlwaysEnabled(true)
+                }
+                val newSource = ProgressiveMediaSource.Factory(cachedFactory, newExtractors)
                     .createMediaSource(mediaItem)
                 exoPlayer.setMediaSource(newSource, currentPos)
                 exoPlayer.prepare()
@@ -497,15 +519,22 @@ fun PlaybackScreen(
                     || error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_UNSPECIFIED
 
                 if (isRecoverable) {
+                    val wasUserPlaying = isPlaying // Respect user pause state — never unpause if user paused
                     if (playerErrorRetryCount < 2) {
                         playerErrorRetryCount++
                         val resumePos = currentPosition.coerceAtLeast(0L)
-                        Log.w("PlaybackScreen", "Recoverable error — attempting retry $playerErrorRetryCount at position $resumePos ms")
-                        showToast("Reconnecting... ($playerErrorRetryCount/2)", Icons.Default.PlayArrow)
+                        Log.w("PlaybackScreen", "Recoverable error — attempting retry $playerErrorRetryCount at position $resumePos ms (wasPlaying=$wasUserPlaying)")
+                        if (wasUserPlaying) {
+                            showToast("Reconnecting... ($playerErrorRetryCount/2)", Icons.Default.PlayArrow)
+                        }
                         try {
                             exoPlayer.prepare()
                             if (resumePos > 0L) exoPlayer.seekTo(resumePos)
-                            exoPlayer.play()
+                            if (wasUserPlaying) {
+                                exoPlayer.play()
+                            } else {
+                                exoPlayer.pause()
+                            }
                         } catch (e: Exception) {
                             Log.e("PlaybackScreen", "Recovery attempt $playerErrorRetryCount failed", e)
                         }
@@ -516,7 +545,11 @@ fun PlaybackScreen(
                                 playerErrorRetryCount = 0
                                 exoPlayer.prepare()
                                 if (resumePos > 0L) exoPlayer.seekTo(resumePos)
-                                exoPlayer.play()
+                                if (wasUserPlaying) {
+                                    exoPlayer.play()
+                                } else {
+                                    exoPlayer.pause()
+                                }
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }
@@ -623,32 +656,85 @@ fun PlaybackScreen(
         }
     }
 
-    // Bug 1 Fix: Debounced seek — rapid key presses cancel the previous pending seek
-    // and schedule a new one 300ms later. This prevents ExoPlayer from being flooded
-    // with overlapping seek requests which causes SOURCE_ERROR / stream failure.
+    // YOUTUBE / NETFLIX STYLE ADAPTIVE VELOCITY SEEKING
+    // Single clicks jump 10s. Holding remote buttons smoothly accelerates:
+    // 10s -> 20s -> 30s -> 1 minute -> 2 minutes per tick.
+    // When the user releases the button, ExoPlayer commits the seek smoothly after a 500ms debounce.
+    fun calculateAdaptiveStep(isForward: Boolean): Long {
+        val now = System.currentTimeMillis()
+        if (now - lastSeekTimestamp < 850L) {
+            seekConsecutiveCount++
+        } else {
+            seekConsecutiveCount = 1
+            accumulatedSeekDelta = 0L
+        }
+        lastSeekTimestamp = now
+
+        val step = when {
+            seekConsecutiveCount <= 2 -> 10_000L      // First 2 clicks: 10 seconds
+            seekConsecutiveCount <= 5 -> 20_000L      // Next few clicks: 20 seconds
+            seekConsecutiveCount <= 9 -> 30_000L      // Holding: 30 seconds
+            seekConsecutiveCount <= 15 -> 60_000L     // Holding longer: 1 minute
+            else -> 120_000L                          // Fast scrub: 2 minutes
+        }
+
+        if (isForward) {
+            accumulatedSeekDelta += step
+        } else {
+            accumulatedSeekDelta -= step
+        }
+
+        return step
+    }
+
+    fun formatSeekDelta(deltaMillis: Long): String {
+        val isPos = deltaMillis >= 0
+        val absSecs = kotlin.math.abs(deltaMillis) / 1000
+        val prefix = if (isPos) "+" else "-"
+        return if (absSecs < 60) {
+            "$prefix${absSecs}s"
+        } else {
+            val mins = absSecs / 60
+            val remainingSecs = absSecs % 60
+            if (remainingSecs == 0L) {
+                "$prefix${mins}m"
+            } else {
+                "$prefix${mins}m ${remainingSecs}s"
+            }
+        }
+    }
+
     fun seekForward() {
         showControls()
-        showToast("Forward +10s", Icons.Default.FastForward)
+        val step = calculateAdaptiveStep(true)
+        val formattedDelta = formatSeekDelta(accumulatedSeekDelta)
+        showToast("Forward $formattedDelta", Icons.Default.FastForward)
         // Optimistically update UI position immediately
-        currentPosition = (currentPosition + 10000L).coerceAtMost(duration)
+        currentPosition = (currentPosition + step).coerceAtMost(duration)
         seekDebounceJob?.cancel()
         seekDebounceJob = coroutineScope.launch {
-            delay(300)
+            delay(500) // Commit seek 500ms after user stops pressing remote
             exoPlayer.seekTo(currentPosition)
             playerErrorRetryCount = 0 // reset retry counter on intentional seek
+            accumulatedSeekDelta = 0L
+            seekConsecutiveCount = 0
         }
     }
 
     fun seekRewind() {
         showControls()
-        showToast("Rewind -10s", Icons.Default.FastRewind)
+        val step = calculateAdaptiveStep(false)
+        val formattedDelta = formatSeekDelta(accumulatedSeekDelta)
+        showToast("Rewind $formattedDelta", Icons.Default.FastRewind)
         // Optimistically update UI position immediately
-        currentPosition = (currentPosition - 10000L).coerceAtLeast(0L)
+        currentPosition = (currentPosition - step).coerceAtLeast(0L)
         seekDebounceJob?.cancel()
         seekDebounceJob = coroutineScope.launch {
-            delay(300)
+            delay(500) // Commit seek 500ms after user stops pressing remote
             exoPlayer.seekTo(currentPosition)
             playerErrorRetryCount = 0 // reset retry counter on intentional seek
+            accumulatedSeekDelta = 0L
+            seekConsecutiveCount = 0
         }
     }
 
@@ -1175,27 +1261,56 @@ private fun PlaybackTimeline(
     
     var isFocused by remember { mutableStateOf(false) }
     var tempSeekPosition by remember { mutableStateOf<Long?>(null) }
+    var timelineConsecutiveCount by remember { mutableIntStateOf(0) }
+    var lastTimelineSeekTimestamp by remember { mutableLongStateOf(0L) }
     
     val displayPosition = tempSeekPosition ?: currentPosition
+    val isScrubbing = tempSeekPosition != null
     
-    // Debounce actual seek player updates
+    // Smoothly commit seek 500ms after user finishes scrubbing on the timeline
     LaunchedEffect(tempSeekPosition) {
         val targetPos = tempSeekPosition ?: return@LaunchedEffect
-        delay(400)
+        delay(500)
         onSeek(targetPos)
+        tempSeekPosition = null
+        timelineConsecutiveCount = 0
     }
+    
+    fun getTimelineAdaptiveStep(): Long {
+        val now = System.currentTimeMillis()
+        if (now - lastTimelineSeekTimestamp < 850L) {
+            timelineConsecutiveCount++
+        } else {
+            timelineConsecutiveCount = 1
+        }
+        lastTimelineSeekTimestamp = now
+
+        return when {
+            timelineConsecutiveCount <= 2 -> 10_000L      // First 2 clicks: 10 seconds
+            timelineConsecutiveCount <= 5 -> 20_000L      // Next clicks: 20 seconds
+            timelineConsecutiveCount <= 9 -> 30_000L      // Holding: 30 seconds
+            timelineConsecutiveCount <= 15 -> 60_000L     // Holding longer: 1 minute
+            else -> 120_000L                              // Fast scrub: 2 minutes
+        }
+    }
+
+    val animatedTrackHeight by animateDpAsState(
+        targetValue = if (isFocused) 8.dp else 4.dp,
+        animationSpec = tween(200),
+        label = "trackHeight"
+    )
     
     TVFocusableItem(
         onClick = {
-            // If tempSeekPosition is not null, confirm seek. Otherwise, toggle Play/Pause
             if (tempSeekPosition != null) {
                 onSeek(tempSeekPosition!!)
                 tempSeekPosition = null
+                timelineConsecutiveCount = 0
             } else {
                 onTogglePlayPause()
             }
         },
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(12.dp),
         scaleOnFocus = 1.0f,
         borderColor = Color.Transparent,
         glowColor = Color.Transparent,
@@ -1205,27 +1320,22 @@ private fun PlaybackTimeline(
             .fillMaxWidth()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
-                // Bug 3 Fix: Do NOT set tempSeekPosition when focus arrives.
-                // Previously this caused an accidental seek 400ms after every
-                // time the seekbar gained focus (e.g. user just wanted to see controls).
-                // tempSeekPosition is now only set by explicit DPAD_LEFT/RIGHT presses.
                 if (!focusState.isFocused) {
                     tempSeekPosition = null
+                    timelineConsecutiveCount = 0
                 }
             }
             .onPreviewKeyEvent { keyEvent ->
                 if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
                     when (keyEvent.nativeKeyEvent.keyCode) {
                         KeyEvent.KEYCODE_DPAD_LEFT -> {
-                            // Bug 3 Fix: Fixed 10s step — consistent & predictable.
-                            // Previous dynamic step (duration/100) was confusing.
-                            val step = 10_000L
+                            val step = getTimelineAdaptiveStep()
                             val currentTemp = tempSeekPosition ?: currentPosition
                             tempSeekPosition = (currentTemp - step).coerceAtLeast(0L)
                             true
                         }
                         KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            val step = 10_000L
+                            val step = getTimelineAdaptiveStep()
                             val currentTemp = tempSeekPosition ?: currentPosition
                             tempSeekPosition = (currentTemp + step).coerceAtMost(duration)
                             true
@@ -1235,85 +1345,173 @@ private fun PlaybackTimeline(
                 } else false
             }
     ) { _ ->
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(vertical = 4.dp)
         ) {
-            Text(
-                text = formatTime(displayPosition),
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (isFocused) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.8f),
-                fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Normal
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            
-            // Progress Bar Track
-            val height = if (isFocused) 8.dp else 4.dp
+            // Floating Scrubbing Target Bubble (Visible during scrubbing or focus)
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .height(24.dp), // larger height to allow thumb to draw without clipping
+                    .fillMaxWidth()
+                    .height(32.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
-                // Track Background
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(height)
-                        .clip(RoundedCornerShape(height / 2))
-                        .background(Color.White.copy(alpha = 0.2f))
-                )
-                
-                // Buffer bar
-                val bufferFraction = if (duration > 0) bufferPosition.toFloat() / duration else 0f
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(bufferFraction)
-                        .height(height)
-                        .clip(RoundedCornerShape(height / 2))
-                        .background(Color.White.copy(alpha = 0.2f))
-                )
-                
-                // Progress bar
-                val progressFraction = if (duration > 0) displayPosition.toFloat() / duration else 0f
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(progressFraction)
-                        .height(height)
-                        .clip(RoundedCornerShape(height / 2))
-                        .background(
-                            if (isFocused) MaterialTheme.colorScheme.primary 
-                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                        )
-                )
-                
-                // Thumb circle (Visible only when focused)
-                if (isFocused) {
+                if (isScrubbing) {
+                    val scrubFraction = if (duration > 0) (displayPosition.toFloat() / duration).coerceIn(0f, 1f) else 0f
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(progressFraction)
-                            .height(height),
+                            .fillMaxWidth(scrubFraction)
+                            .align(Alignment.CenterStart),
                         contentAlignment = Alignment.CenterEnd
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(16.dp)
-                                .background(Color.White, CircleShape)
-                                .align(Alignment.CenterEnd)
-                                .offset(x = 8.dp) // shift by half of thumb size
-                        )
+                                .offset(x = 24.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(Color(0xFF0F172A), Color(0xFF1E293B))
+                                    )
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    brush = Brush.horizontalGradient(
+                                        listOf(Color(0xFF00E5FF), Color(0xFF3B82F6))
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = formatTime(displayPosition),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color(0xFF00E5FF)
+                            )
+                        }
                     }
                 }
             }
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = formatTime(duration),
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.8f)
-            )
+
+            // Main Timeline Row: Elapsed Time + Track + Remaining Time
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Elapsed Time Pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.Black.copy(alpha = if (isFocused) 0.5f else 0.3f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = formatTime(displayPosition),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (isFocused) Color(0xFF00E5FF) else Color.White.copy(alpha = 0.85f),
+                        fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Medium
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(14.dp))
+                
+                // Progress Bar Track Container
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(28.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    // Track Background (Dark Glass)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(animatedTrackHeight)
+                            .clip(RoundedCornerShape(animatedTrackHeight / 2))
+                            .background(Color.White.copy(alpha = 0.15f))
+                    )
+                    
+                    // Buffer bar (Translucent Ice Blue)
+                    val bufferFraction = if (duration > 0) (bufferPosition.toFloat() / duration).coerceIn(0f, 1f) else 0f
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(bufferFraction)
+                            .height(animatedTrackHeight)
+                            .clip(RoundedCornerShape(animatedTrackHeight / 2))
+                            .background(Color(0xFF38BDF8).copy(alpha = 0.35f))
+                    )
+                    
+                    // Active Played Progress Bar (Radiant Cyan-Blue Gradient)
+                    val progressFraction = if (duration > 0) (displayPosition.toFloat() / duration).coerceIn(0f, 1f) else 0f
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(progressFraction)
+                            .height(animatedTrackHeight)
+                            .clip(RoundedCornerShape(animatedTrackHeight / 2))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(
+                                        Color(0xFF00E5FF),
+                                        Color(0xFF0091EA),
+                                        Color(0xFF2979FF)
+                                    )
+                                )
+                            )
+                    )
+                    
+                    // Glowing Halo Thumb (Visible only when focused)
+                    if (isFocused) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progressFraction)
+                                .height(28.dp),
+                            contentAlignment = Alignment.CenterEnd
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .offset(x = 12.dp)
+                            ) {
+                                // Outer Soft Glow Halo
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF00E5FF).copy(alpha = 0.35f))
+                                )
+                                // Inner Solid White Core
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White)
+                                        .border(2.dp, Color(0xFF00E5FF), CircleShape)
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.width(14.dp))
+
+                // Remaining / Total Duration Pill
+                val remainingTime = (duration - displayPosition).coerceAtLeast(0L)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color.Black.copy(alpha = if (isFocused) 0.5f else 0.3f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "-${formatTime(remainingTime)}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
         }
     }
 }
