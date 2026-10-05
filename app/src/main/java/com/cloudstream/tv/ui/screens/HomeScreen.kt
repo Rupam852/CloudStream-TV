@@ -1435,42 +1435,6 @@ fun GoogleLoginOverlay(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (userCode.isNotBlank() && errorMsg == null) {
-                        TVFocusableItem(
-                            onClick = {
-                                try {
-                                    val browserUrl = if (verificationUrl.isNotBlank()) verificationUrl else "https://cloudstream-tv.vercel.app/authenticate?code=$userCode"
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(browserUrl)).apply {
-                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    }
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Could not open browser", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            shape = RoundedCornerShape(8.dp)
-                        ) { isFocused ->
-                            Box(
-                                modifier = Modifier
-                                    .width(170.dp)
-                                    .background(
-                                        if (isFocused) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Open in Browser",
-                                    color = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            }
-                        }
-                    }
-
                     if (errorMsg != null) {
                         TVFocusableItem(
                             onClick = {
@@ -1480,7 +1444,7 @@ fun GoogleLoginOverlay(
                         ) { isFocused ->
                             Box(
                                 modifier = Modifier
-                                    .width(170.dp)
+                                    .width(180.dp)
                                     .background(
                                         if (isFocused) MaterialTheme.colorScheme.primary
                                         else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
@@ -1509,7 +1473,7 @@ fun GoogleLoginOverlay(
                     ) { isFocused ->
                         Box(
                             modifier = Modifier
-                                .width(if (userCode.isNotBlank() || errorMsg != null) 140.dp else 260.dp)
+                                .width(if (errorMsg != null) 180.dp else 260.dp)
                                 .background(
                                     if (isFocused) MaterialTheme.colorScheme.surfaceVariant
                                     else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
