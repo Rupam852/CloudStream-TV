@@ -371,7 +371,7 @@ fun PlaybackScreen(
 
         val okHttpDataSourceFactory = OkHttpDataSource.Factory(tokenRefreshingClient).apply {
             setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-            if (token != null && url.contains("googleapis.com")) {
+            if (token != null) {
                 setDefaultRequestProperties(mapOf("Authorization" to "Bearer $token"))
             }
         }
@@ -443,7 +443,7 @@ fun PlaybackScreen(
                     .build()
                 val newFactory = OkHttpDataSource.Factory(refreshedClient).apply {
                     setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    if (url.contains("googleapis.com")) {
+                    if (newToken != null) {
                         setDefaultRequestProperties(mapOf("Authorization" to "Bearer $newToken"))
                     }
                 }
