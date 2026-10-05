@@ -51,13 +51,6 @@ export default {
         );
       }
 
-      // Build target Google Drive API URL
-      const apiKey = url.searchParams.get("key");
-      let targetUrl = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`;
-      if (apiKey) {
-        targetUrl += `&key=${encodeURIComponent(apiKey)}`;
-      }
-
       // Prepare request headers
       const reqHeaders = new Headers();
       
@@ -70,10 +63,24 @@ export default {
       // Pass Authorization header if present in request or query
       const authHeader = request.headers.get("Authorization");
       const tokenParam = url.searchParams.get("token");
+      const apiKey = url.searchParams.get("key");
+
       if (authHeader) {
         reqHeaders.set("Authorization", authHeader);
       } else if (tokenParam) {
         reqHeaders.set("Authorization", `Bearer ${tokenParam}`);
+      }
+
+      // Build target URL
+      let targetUrl = "";
+      if (authHeader || tokenParam || apiKey) {
+        targetUrl = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`;
+        if (apiKey) {
+          targetUrl += `&key=${encodeURIComponent(apiKey)}`;
+        }
+      } else {
+        // Public/shared Google Drive direct download URL with bypass for large file virus warning
+        targetUrl = `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=download&confirm=t`;
       }
 
       // Set standard browser user agent to ensure optimal Google peering
@@ -83,11 +90,22 @@ export default {
       );
 
       try {
-        const driveResponse = await fetch(targetUrl, {
+        let driveResponse = await fetch(targetUrl, {
           method: "GET",
           headers: reqHeaders,
           redirect: "follow",
         });
+
+        // If usercontent fallback is needed or returns HTML confirmation
+        const contentType = driveResponse.headers.get("Content-Type") || "";
+        if (contentType.includes("text/html") && !authHeader && !tokenParam) {
+          const fallbackUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}&confirm=t`;
+          driveResponse = await fetch(fallbackUrl, {
+            method: "GET",
+            headers: reqHeaders,
+            redirect: "follow",
+          });
+        }
 
         // Forward response with permissive CORS and optimized streaming headers
         const resHeaders = new Headers(driveResponse.headers);
