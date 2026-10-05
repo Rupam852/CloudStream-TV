@@ -401,12 +401,12 @@
                 </div>
 
                 <div class="form-group">
-                    <label>OAuth Access Token (Optional if file/folder is public)</label>
-                    <input type="password" id="oauth-token" placeholder="Bearer ya29.a0Ac...">
-                    <div style="display: flex; gap: 8px; margin-top: 6px;">
-                        <button class="btn btn-secondary btn-sm" onclick="openOAuthLogin()">Get Token via OAuth</button>
+                    <label>Google Drive Authentication</label>
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <button class="btn btn-secondary btn-sm" onclick="openOAuthLogin()" style="flex: 1; background: rgba(0, 229, 255, 0.15); border-color: var(--accent); color: var(--accent); font-weight: 700;">🔑 1-Click Sign In with Google</button>
                         <button class="btn btn-secondary btn-sm" onclick="clearToken()">Clear</button>
                     </div>
+                    <input type="password" id="oauth-token" placeholder="OAuth Token will auto-fill after Sign In (or paste manually)">
                 </div>
 
                 <div class="form-group">
@@ -707,18 +707,48 @@
     }
 
     function openOAuthLogin() {
-        window.open("/authenticate.html", "_blank");
+        const clientId = "859382304635-3djbp5sbiflkq9b07jr17qpr812d10u5.apps.googleusercontent.com";
+        const redirectUri = window.location.origin + window.location.pathname;
+        const scope = encodeURIComponent("https://www.googleapis.com/auth/drive.readonly");
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${scope}&prompt=consent`;
+        log("Redirecting to Google OAuth Sign-in...", "info");
+        window.location.href = authUrl;
     }
 
     function clearToken() {
         oauthTokenInput.value = "";
+        localStorage.removeItem("test_oauth_token");
         log("OAuth token cleared.");
     }
 
-    // Auto-ping on load
+    // Auto-ping & Token Init on load
     window.addEventListener("DOMContentLoaded", () => {
+        // Restore saved folder
+        const savedFolder = localStorage.getItem("test_folder_id");
+        if (savedFolder) folderIdInput.value = savedFolder;
+
+        // Check OAuth token from URL Hash (Google Redirect)
+        if (window.location.hash) {
+            const hash = window.location.hash.substring(1);
+            const params = new URLSearchParams(hash);
+            const token = params.get("access_token");
+            if (token) {
+                oauthTokenInput.value = token;
+                localStorage.setItem("test_oauth_token", token);
+                log("✅ Google OAuth Login Successful! Token attached.", "success");
+                history.replaceState(null, "", window.location.pathname);
+            }
+        } else {
+            const savedToken = localStorage.getItem("test_oauth_token");
+            if (savedToken) oauthTokenInput.value = savedToken;
+        }
+
         pingWorker();
-        renderDemoVideos();
+        if (folderIdInput.value.trim() && folderIdInput.value.trim() !== "demo-videos" && oauthTokenInput.value.trim()) {
+            loadFolderContents();
+        } else {
+            renderDemoVideos();
+        }
     });
 </script>
 </body>
