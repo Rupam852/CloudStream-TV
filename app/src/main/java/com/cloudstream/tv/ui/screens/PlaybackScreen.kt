@@ -186,8 +186,10 @@ fun PlaybackScreen(
 
         ExoPlayer.Builder(context)
             .setLoadControl(loadControl)
+            .setSeekParameters(androidx.media3.exoplayer.SeekParameters.CLOSEST_SYNC)
             .build().apply {
                 playWhenReady = true
+                setSeekParameters(androidx.media3.exoplayer.SeekParameters.CLOSEST_SYNC)
                 // Set audio attributes to optimize for TV movie playback
                 val attributes = androidx.media3.common.AudioAttributes.Builder()
                     .setUsage(androidx.media3.common.C.USAGE_MEDIA)
@@ -259,6 +261,7 @@ fun PlaybackScreen(
 
     // Coroutine scope for debounced seeks
     val coroutineScope = rememberCoroutineScope()
+    var isSeeking by remember { mutableStateOf(false) }
     var seekDebounceJob by remember { mutableStateOf<Job?>(null) }
     var seekConsecutiveCount by remember { mutableIntStateOf(0) }
     var lastSeekTimestamp by remember { mutableLongStateOf(0L) }
@@ -592,17 +595,19 @@ fun PlaybackScreen(
     }
 
     // Periodically update playback positions (seekbar timeline) and save progress every 5 seconds
-    LaunchedEffect(isPlaying) {
+    LaunchedEffect(isPlaying, isSeeking) {
         var saveCounter = 0
         while (isPlaying) {
-            currentPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
-            bufferPosition = exoPlayer.bufferedPosition.coerceAtLeast(0L)
+            if (!isSeeking) {
+                currentPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
+                bufferPosition = exoPlayer.bufferedPosition.coerceAtLeast(0L)
+            }
             
             saveCounter++
             if (saveCounter >= 20) { // 20 * 250ms = 5000ms (5 seconds)
                 saveCounter = 0
                 val totalDur = exoPlayer.duration
-                if (totalDur > 0 && currentPosition > 3000 && currentPosition < totalDur * 0.95) {
+                if (!isSeeking && totalDur > 0 && currentPosition > 3000 && currentPosition < totalDur * 0.95) {
                     repository.savePlaybackPosition(activeFile.id, currentPosition)
                 }
             }
@@ -659,7 +664,7 @@ fun PlaybackScreen(
     // YOUTUBE / NETFLIX STYLE ADAPTIVE VELOCITY SEEKING
     // Single clicks jump 10s. Holding remote buttons smoothly accelerates:
     // 10s -> 20s -> 30s -> 1 minute -> 2 minutes per tick.
-    // When the user releases the button, ExoPlayer commits the seek smoothly after a 500ms debounce.
+    // When the user releases the button, ExoPlayer commits the seek smoothly after a 600ms debounce.
     fun calculateAdaptiveStep(isForward: Boolean): Long {
         val now = System.currentTimeMillis()
         if (now - lastSeekTimestamp < 850L) {
@@ -706,35 +711,43 @@ fun PlaybackScreen(
 
     fun seekForward() {
         showControls()
+        isSeeking = true
         val step = calculateAdaptiveStep(true)
         val formattedDelta = formatSeekDelta(accumulatedSeekDelta)
         showToast("Forward $formattedDelta", Icons.Default.FastForward)
         // Optimistically update UI position immediately
-        currentPosition = (currentPosition + step).coerceAtMost(duration)
+        val targetPos = (currentPosition + step).coerceAtMost(duration)
+        currentPosition = targetPos
         seekDebounceJob?.cancel()
         seekDebounceJob = coroutineScope.launch {
-            delay(500) // Commit seek 500ms after user stops pressing remote
-            exoPlayer.seekTo(currentPosition)
+            delay(600) // Commit seek 600ms after user stops pressing remote
+            exoPlayer.seekTo(targetPos)
             playerErrorRetryCount = 0 // reset retry counter on intentional seek
             accumulatedSeekDelta = 0L
             seekConsecutiveCount = 0
+            delay(500)
+            isSeeking = false
         }
     }
 
     fun seekRewind() {
         showControls()
+        isSeeking = true
         val step = calculateAdaptiveStep(false)
         val formattedDelta = formatSeekDelta(accumulatedSeekDelta)
         showToast("Rewind $formattedDelta", Icons.Default.FastRewind)
         // Optimistically update UI position immediately
-        currentPosition = (currentPosition - step).coerceAtLeast(0L)
+        val targetPos = (currentPosition - step).coerceAtLeast(0L)
+        currentPosition = targetPos
         seekDebounceJob?.cancel()
         seekDebounceJob = coroutineScope.launch {
-            delay(500) // Commit seek 500ms after user stops pressing remote
-            exoPlayer.seekTo(currentPosition)
+            delay(600) // Commit seek 600ms after user stops pressing remote
+            exoPlayer.seekTo(targetPos)
             playerErrorRetryCount = 0 // reset retry counter on intentional seek
             accumulatedSeekDelta = 0L
             seekConsecutiveCount = 0
+            delay(500)
+            isSeeking = false
         }
     }
 
@@ -954,9 +967,14 @@ fun PlaybackScreen(
                         bufferPositionProvider = { bufferPosition },
                         duration = duration,
                         onSeek = { targetPos ->
-                            exoPlayer.seekTo(targetPos)
+                            isSeeking = true
                             currentPosition = targetPos
+                            exoPlayer.seekTo(targetPos)
                             showControls()
+                            coroutineScope.launch {
+                                delay(600)
+                                isSeeking = false
+                            }
                         },
                         onTogglePlayPause = {
                             togglePlayPause()
