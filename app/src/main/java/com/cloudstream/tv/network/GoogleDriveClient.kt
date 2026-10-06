@@ -162,6 +162,7 @@ object GoogleDriveClient {
         if (!apiKey.isNullOrBlank()) {
             return@withContext "https://www.googleapis.com/drive/v3/files/$fileId?alt=media&key=$apiKey&supportsAllDrives=true"
         }
+        val directUsercontentUrl = "https://drive.usercontent.google.com/download?id=$fileId&export=download&confirm=t"
         val initialUrl = "https://drive.google.com/uc?export=download&id=$fileId"
         val request = Request.Builder()
             .url(initialUrl)
@@ -174,7 +175,7 @@ object GoogleDriveClient {
                 val finalUrl = response.request.url.toString()
                 
                 if (finalUrl.contains("confirm=")) {
-                    return@withContext finalUrl
+                    return@withContext finalUrl.replace("drive.google.com/uc?export=download", "drive.usercontent.google.com/download?export=download")
                 }
                 
                 if (!contentType.contains("text/html")) {
@@ -187,7 +188,7 @@ object GoogleDriveClient {
                 val matcher = confirmPattern.matcher(body)
                 if (matcher.find()) {
                     val token = matcher.group(1)
-                    return@withContext "https://drive.google.com/uc?export=download&id=$fileId&confirm=$token"
+                    return@withContext "https://drive.usercontent.google.com/download?id=$fileId&export=download&confirm=$token"
                 }
                 
                 val cookies = response.headers("Set-Cookie")
@@ -195,15 +196,15 @@ object GoogleDriveClient {
                     val cookieMatcher = confirmPattern.matcher(cookie)
                     if (cookieMatcher.find()) {
                         val token = cookieMatcher.group(1)
-                        return@withContext "https://drive.google.com/uc?export=download&id=$fileId&confirm=$token"
+                        return@withContext "https://drive.usercontent.google.com/download?id=$fileId&export=download&confirm=$token"
                     }
                 }
                 
-                initialUrl
+                directUsercontentUrl
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error resolving direct URL for $fileId", e)
-            initialUrl
+            directUsercontentUrl
         }
     }
 
