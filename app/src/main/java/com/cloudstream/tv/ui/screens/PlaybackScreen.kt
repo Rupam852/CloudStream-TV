@@ -758,13 +758,11 @@ fun PlaybackScreen(
         currentPosition = targetPos
         seekDebounceJob?.cancel()
         seekDebounceJob = coroutineScope.launch {
-            delay(600) // Commit seek 600ms after user stops pressing remote
+            delay(500) // Commit seek 500ms after user stops pressing remote
             exoPlayer.seekTo(targetPos)
             playerErrorRetryCount = 0 // reset retry counter on intentional seek
             accumulatedSeekDelta = 0L
             seekConsecutiveCount = 0
-            delay(500)
-            isSeeking = false
         }
     }
 
@@ -1009,10 +1007,6 @@ fun PlaybackScreen(
                             currentPosition = targetPos
                             exoPlayer.seekTo(targetPos)
                             showControls()
-                            coroutineScope.launch {
-                                delay(600)
-                                isSeeking = false
-                            }
                         },
                         onTogglePlayPause = {
                             togglePlayPause()
