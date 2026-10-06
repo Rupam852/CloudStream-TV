@@ -172,13 +172,13 @@ fun PlaybackScreen(
         // Buffers up to 3 minutes ahead in the background and keeps 30 seconds back-buffer for instant rewind.
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                60_000,  // minBufferMs (60s minimum ahead)
-                180_000, // maxBufferMs (3 minutes maximum ahead)
+                15_000,  // minBufferMs (15s minimum ahead for instant responsive streaming)
+                60_000,  // maxBufferMs (1 minute maximum buffer)
                 1_000,   // bufferForPlaybackMs (instant 1s fast startup)
-                2_000    // bufferForPlaybackAfterRebufferMs (fast 2s rebuffer)
+                1_500    // bufferForPlaybackAfterRebufferMs (fast 1.5s rebuffer on seek)
             )
             .setBackBuffer(
-                30_000,  // backBufferDurationMs (30s rewind kept in RAM/Disk)
+                15_000,  // backBufferDurationMs (15s rewind kept in RAM)
                 true     // retainBackBufferFromKeyframe
             )
             .setPrioritizeTimeOverSizeThresholds(true)
@@ -333,8 +333,22 @@ fun PlaybackScreen(
     // Load active file into player when resolved URL is ready
     LaunchedEffect(resolvedUrl) {
         val url = resolvedUrl ?: return@LaunchedEffect
-        val mediaItem = MediaItem.fromUri(url)
         val token = oauthToken
+
+        val mimeType = when {
+            activeFile.name.endsWith(".mkv", ignoreCase = true) || (activeFile.mimeType.contains("matroska", ignoreCase = true)) -> androidx.media3.common.MimeTypes.APPLICATION_MATROSKA
+            activeFile.name.endsWith(".mp4", ignoreCase = true) || (activeFile.mimeType.contains("mp4", ignoreCase = true)) -> androidx.media3.common.MimeTypes.APPLICATION_MP4
+            activeFile.name.endsWith(".webm", ignoreCase = true) || (activeFile.mimeType.contains("webm", ignoreCase = true)) -> androidx.media3.common.MimeTypes.APPLICATION_WEBM
+            else -> null
+        }
+        val mediaItem = MediaItem.Builder()
+            .setUri(url)
+            .apply {
+                if (mimeType != null) {
+                    setMimeType(mimeType)
+                }
+            }
+            .build()
 
         // TOKEN EXPIRY FIX — Defense 2: OkHttp Authenticator
         // When ExoPlayer sends a chunk request with an expired token, Google returns 401.
@@ -379,15 +393,12 @@ fun PlaybackScreen(
             }
         }
 
-        // Wrap with VideoCacheManager for disk-backed chunk caching & instant seeking
-        val cachedDataSourceFactory = VideoCacheManager.buildCacheDataSourceFactory(context, okHttpDataSourceFactory)
-
         val extractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory().apply {
             setConstantBitrateSeekingEnabled(true)
             setConstantBitrateSeekingAlwaysEnabled(true)
         }
 
-        val mediaSource = ProgressiveMediaSource.Factory(cachedDataSourceFactory, extractorsFactory)
+        val mediaSource = ProgressiveMediaSource.Factory(okHttpDataSourceFactory, extractorsFactory)
             .createMediaSource(mediaItem)
 
         exoPlayer.setMediaSource(mediaSource)
@@ -423,10 +434,21 @@ fun PlaybackScreen(
             val previousToken = oauthToken
             val newToken = repository.getAccessToken()
             if (newToken != null && newToken != previousToken) {
-                // Token was refreshed — rebuild media source at current position
-                Log.i("PlaybackScreen", "Token changed — rebuilding media source at $currentPos ms")
                 val url = resolvedUrl ?: break
-                val mediaItem = MediaItem.fromUri(url)
+                val mimeType = when {
+                    activeFile.name.endsWith(".mkv", ignoreCase = true) || (activeFile.mimeType.contains("matroska", ignoreCase = true)) -> androidx.media3.common.MimeTypes.APPLICATION_MATROSKA
+                    activeFile.name.endsWith(".mp4", ignoreCase = true) || (activeFile.mimeType.contains("mp4", ignoreCase = true)) -> androidx.media3.common.MimeTypes.APPLICATION_MP4
+                    activeFile.name.endsWith(".webm", ignoreCase = true) || (activeFile.mimeType.contains("webm", ignoreCase = true)) -> androidx.media3.common.MimeTypes.APPLICATION_WEBM
+                    else -> null
+                }
+                val mediaItem = MediaItem.Builder()
+                    .setUri(url)
+                    .apply {
+                        if (mimeType != null) {
+                            setMimeType(mimeType)
+                        }
+                    }
+                    .build()
                 val refreshedClient = OkHttpClient.Builder()
                     .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
                     .retryOnConnectionFailure(true)
@@ -450,12 +472,11 @@ fun PlaybackScreen(
                         setDefaultRequestProperties(mapOf("Authorization" to "Bearer $newToken"))
                     }
                 }
-                val cachedFactory = VideoCacheManager.buildCacheDataSourceFactory(context, newFactory)
                 val newExtractors = androidx.media3.extractor.DefaultExtractorsFactory().apply {
                     setConstantBitrateSeekingEnabled(true)
                     setConstantBitrateSeekingAlwaysEnabled(true)
                 }
-                val newSource = ProgressiveMediaSource.Factory(cachedFactory, newExtractors)
+                val newSource = ProgressiveMediaSource.Factory(newFactory, newExtractors)
                     .createMediaSource(mediaItem)
                 exoPlayer.setMediaSource(newSource, currentPos)
                 exoPlayer.prepare()
@@ -495,6 +516,9 @@ fun PlaybackScreen(
             override fun onPlaybackStateChanged(state: Int) {
                 duration = exoPlayer.duration.coerceAtLeast(0L)
                 isBuffering = state == Player.STATE_BUFFERING
+                if (state == Player.STATE_READY) {
+                    isSeeking = false
+                }
                 if (state == Player.STATE_ENDED) {
                     // Video has completed, so clear saved resume progress
                     repository.clearPlaybackPosition(activeFile.id)
@@ -504,6 +528,17 @@ fun PlaybackScreen(
                         exoPlayer.seekTo(0)
                         exoPlayer.pause()
                     }
+                }
+            }
+
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+                    currentPosition = newPosition.positionMs.coerceAtLeast(0L)
+                    isSeeking = false
                 }
             }
 
@@ -595,11 +630,14 @@ fun PlaybackScreen(
     }
 
     // Periodically update playback positions (seekbar timeline) and save progress every 5 seconds
-    LaunchedEffect(isPlaying, isSeeking) {
+    LaunchedEffect(isPlaying, isSeeking, isBuffering) {
         var saveCounter = 0
         while (isPlaying) {
-            if (!isSeeking) {
-                currentPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
+            if (!isSeeking && !isBuffering && exoPlayer.playbackState == Player.STATE_READY) {
+                val pos = exoPlayer.currentPosition.coerceAtLeast(0L)
+                if (pos >= 0L) {
+                    currentPosition = pos
+                }
                 bufferPosition = exoPlayer.bufferedPosition.coerceAtLeast(0L)
             }
             
@@ -607,7 +645,7 @@ fun PlaybackScreen(
             if (saveCounter >= 20) { // 20 * 250ms = 5000ms (5 seconds)
                 saveCounter = 0
                 val totalDur = exoPlayer.duration
-                if (!isSeeking && totalDur > 0 && currentPosition > 3000 && currentPosition < totalDur * 0.95) {
+                if (!isSeeking && !isBuffering && totalDur > 0 && currentPosition > 3000 && currentPosition < totalDur * 0.95) {
                     repository.savePlaybackPosition(activeFile.id, currentPosition)
                 }
             }
