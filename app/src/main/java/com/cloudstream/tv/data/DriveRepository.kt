@@ -28,6 +28,7 @@ class DriveRepository(context: Context) {
         private const val KEY_OAUTH_CLIENT_SECRET = "oauth_client_secret"
         private const val KEY_WARNING_DISMISSED = "warning_notice_dismissed"
         private const val KEY_PLAYBACK_POSITIONS = "playback_positions"
+        private const val KEY_WATCHED_FILES = "watched_files_set"
         private const val KEY_CDN_PROXY_URL = "cloudflare_cdn_proxy_url"
         const val DEFAULT_CDN_PROXY_URL = "https://cloudstream-proxy.rupambairagya08.workers.dev"
     }
@@ -154,6 +155,31 @@ class DriveRepository(context: Context) {
 
     fun clearAllPlaybackPositions() {
         prefs.edit().remove(KEY_PLAYBACK_POSITIONS).apply()
+    }
+
+    // --- Watched Status (Checkmark Badge) ---
+    fun getWatchedFileIds(): Set<String> {
+        return prefs.getStringSet(KEY_WATCHED_FILES, emptySet())?.toSet() ?: emptySet()
+    }
+
+    fun isWatched(fileId: String): Boolean {
+        return getWatchedFileIds().contains(fileId)
+    }
+
+    fun setWatched(fileId: String, watched: Boolean) {
+        val current = getWatchedFileIds().toMutableSet()
+        if (watched) {
+            current.add(fileId)
+        } else {
+            current.remove(fileId)
+        }
+        prefs.edit().putStringSet(KEY_WATCHED_FILES, current).apply()
+    }
+
+    fun toggleWatched(fileId: String): Boolean {
+        val isNowWatched = !isWatched(fileId)
+        setWatched(fileId, isNowWatched)
+        return isNowWatched
     }
 
     // --- Preferences & Settings ---

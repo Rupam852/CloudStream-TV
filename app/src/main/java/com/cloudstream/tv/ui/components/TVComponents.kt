@@ -229,17 +229,20 @@ fun TVCard(
             }
 
             if (badgeText != null) {
+                val isWatchedBadge = badgeText.contains("Watched") || badgeText.contains("✓")
+                val badgeBg = if (isWatchedBadge) Color(0xFF10B981).copy(alpha = 0.25f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                val badgeColor = if (isWatchedBadge) Color(0xFF10B981) else MaterialTheme.colorScheme.primary
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        .background(badgeBg)
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = badgeText,
                         style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary
+                        color = badgeColor
                     )
                 }
             }
@@ -318,17 +321,20 @@ fun TVWideCard(
             }
             
             if (badgeText != null) {
+                val isWatchedBadge = badgeText.contains("Watched") || badgeText.contains("✓")
+                val badgeBg = if (isWatchedBadge) Color(0xFF10B981).copy(alpha = 0.25f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                val badgeColor = if (isWatchedBadge) Color(0xFF10B981) else MaterialTheme.colorScheme.primary
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        .background(badgeBg)
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = badgeText,
                         style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary
+                        color = badgeColor
                     )
                 }
             }

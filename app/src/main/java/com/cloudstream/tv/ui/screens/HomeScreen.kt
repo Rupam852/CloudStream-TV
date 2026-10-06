@@ -129,6 +129,9 @@ fun HomeScreen(
     val folderNavigationStack = remember { mutableStateListOf<String>() }
     var currentFolderId by remember { mutableStateOf(selectedFolderId) }
 
+    // Watched state
+    var watchedFileIds by remember { mutableStateOf(repository.getWatchedFileIds()) }
+
     // Files state
     var filesList by remember { mutableStateOf<List<DriveFile>>(emptyList()) }
     var isLoadingFiles by remember { mutableStateOf(false) }
@@ -170,6 +173,7 @@ fun HomeScreen(
         
         isLoadingFiles = true
         loadingError = null
+        watchedFileIds = repository.getWatchedFileIds()
         try {
             val results = withContext(Dispatchers.IO) {
                 val isLoggedIn = repository.isLoggedIn()
@@ -412,11 +416,12 @@ fun HomeScreen(
                         ) {
                             items(recentlyViewedList, key = { it.id }) { file ->
                                 val icon = if (file.isVideo) Icons.Default.Movie else Icons.Default.Image
+                                val isWatched = watchedFileIds.contains(file.id)
                                 TVWideCard(
                                     title = file.name,
                                     subtitle = if (file.isVideo) "Video File" else "Photo File",
                                     icon = icon,
-                                    badgeText = "Recent",
+                                    badgeText = if (isWatched && file.isVideo) "✓ Watched" else "Recent",
                                     onClick = {
                                         if (file.isVideo) {
                                             onPlayVideo(file, listOf(file))
@@ -591,6 +596,7 @@ fun HomeScreen(
                                             else -> Icons.Default.Image
                                         }
                                         val requester = fileFocusRequesters.getOrPut(file.id) { FocusRequester() }
+                                        val isWatched = watchedFileIds.contains(file.id)
                                         TVCard(
                                             title = file.name,
                                             modifier = Modifier.focusRequester(requester),
@@ -600,6 +606,7 @@ fun HomeScreen(
                                                 else -> "Image"
                                             },
                                             icon = icon,
+                                            badgeText = if (isWatched && file.isVideo) "✓ Watched" else null,
                                             onClick = {
                                                 if (file.isFolder) {
                                                     // H1 Fix: Safe null check — currentFolderId can be null on
@@ -641,6 +648,13 @@ fun HomeScreen(
                                                         Toast.makeText(context, "Deleted: ${file.name}", Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
+                                            } else if (file.isVideo) {
+                                                {
+                                                    val isNow = repository.toggleWatched(file.id)
+                                                    watchedFileIds = repository.getWatchedFileIds()
+                                                    val msg = if (isNow) "Marked as Watched" else "Marked as Unwatched"
+                                                    Toast.makeText(context, "$msg: ${file.name}", Toast.LENGTH_SHORT).show()
+                                                }
                                             } else null
                                         )
                                     }
@@ -658,6 +672,7 @@ fun HomeScreen(
                                             else -> Icons.Default.Image
                                         }
                                         val requester = fileFocusRequesters.getOrPut(file.id) { FocusRequester() }
+                                        val isWatched = watchedFileIds.contains(file.id)
                                         TVFocusableItem(
                                             onClick = {
                                                 if (file.isFolder) {
@@ -676,6 +691,14 @@ fun HomeScreen(
                                                     Toast.makeText(context, "File streaming not supported", Toast.LENGTH_SHORT).show()
                                                 }
                                             },
+                                            onLongClick = if (file.isVideo) {
+                                                {
+                                                    val isNow = repository.toggleWatched(file.id)
+                                                    watchedFileIds = repository.getWatchedFileIds()
+                                                    val msg = if (isNow) "Marked as Watched" else "Marked as Unwatched"
+                                                    Toast.makeText(context, "$msg: ${file.name}", Toast.LENGTH_SHORT).show()
+                                                }
+                                            } else null,
                                             onFocus = {
                                                 targetBackdropUrl = if (file.isFolder) null else {
                                                     file.thumbnailUrl ?: if (file.isImage) file.streamUrl else null
@@ -713,6 +736,20 @@ fun HomeScreen(
                                                         style = MaterialTheme.typography.labelLarge,
                                                         color = CloudStreamTheme.extraColors.textMuted
                                                     )
+                                                }
+                                                if (isWatched && file.isVideo) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(4.dp))
+                                                            .background(Color(0xFF10B981).copy(alpha = 0.2f))
+                                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "✓ Watched",
+                                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                            color = Color(0xFF10B981)
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
