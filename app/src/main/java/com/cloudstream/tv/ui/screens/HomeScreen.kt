@@ -1167,14 +1167,11 @@ fun GoogleLoginOverlay(
     onDismiss: () -> Unit,
     onLoginSuccess: () -> Unit
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnClickOutside = false
-        )
-    ) {
-        var userCode by remember { mutableStateOf("") }
+    BackHandler {
+        onDismiss()
+    }
+
+    var userCode by remember { mutableStateOf("") }
         var verificationUrl by remember { mutableStateOf("") }
         var isPolling by remember { mutableStateOf(false) }
         var errorMsg by remember { mutableStateOf<String?>(null) }
@@ -1489,7 +1486,6 @@ fun GoogleLoginOverlay(
                             )
                         }
                     }
-                }
             }
         }
     }
