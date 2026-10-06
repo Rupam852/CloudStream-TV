@@ -1259,13 +1259,7 @@ fun GoogleLoginOverlay(
             }
         }
 
-        // Auto-request focus on the Cancel button when dialog opens safely
-        LaunchedEffect(Unit) {
-            kotlinx.coroutines.delay(200)
-            try {
-                cancelFocusRequester.requestFocus()
-            } catch (_: Exception) {}
-        }
+        // Keep dialog stable and prevent accidental remote dismiss
 
         Box(
             modifier = Modifier
@@ -1460,10 +1454,18 @@ fun GoogleLoginOverlay(
                         }
                     }
 
+                    var canDismiss by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.delay(1200)
+                        canDismiss = true
+                    }
+
                     TVFocusableItem(
                         onClick = {
-                            isPolling = false
-                            onDismiss()
+                            if (canDismiss) {
+                                isPolling = false
+                                onDismiss()
+                            }
                         },
                         modifier = Modifier.focusRequester(cancelFocusRequester),
                         shape = RoundedCornerShape(8.dp)
@@ -1486,10 +1488,10 @@ fun GoogleLoginOverlay(
                             )
                         }
                     }
+                }
             }
         }
     }
-}
 
 @Composable
 fun HomeScreenBackdrop(

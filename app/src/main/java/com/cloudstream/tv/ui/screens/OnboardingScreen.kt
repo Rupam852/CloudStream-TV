@@ -163,13 +163,17 @@ fun OnboardingScreen(
         }
     }
 
-    Row(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(48.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(48.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
         // Left Side: Brand and instructions
         Column(
             modifier = Modifier
@@ -484,18 +488,19 @@ fun OnboardingScreen(
         )
     }
 
-    if (showNetworkDialog) {
-        ConnectivityDialog(
-            onDismiss = {
-                showNetworkDialog = false
-                pendingNetworkAction = null
-            },
-            onRetry = {
-                showNetworkDialog = false
-                pendingNetworkAction?.invoke()
-                pendingNetworkAction = null
-            }
-        )
+        if (showNetworkDialog) {
+            ConnectivityDialog(
+                onDismiss = {
+                    showNetworkDialog = false
+                    pendingNetworkAction = null
+                },
+                onRetry = {
+                    showNetworkDialog = false
+                    pendingNetworkAction?.invoke()
+                    pendingNetworkAction = null
+                }
+            )
+        }
     }
 }
 
