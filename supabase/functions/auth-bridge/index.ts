@@ -277,8 +277,18 @@ serve(async (req) => {
 
     // 5. Refresh token endpoint
     if (path === '/refresh' || path === '/api/refresh') {
-      const refreshToken = url.searchParams.get('refresh_token');
-      const opt = url.searchParams.get('opt') || '1';
+      let refreshToken = url.searchParams.get('refresh_token');
+      let opt = url.searchParams.get('opt') || '1';
+
+      if (!refreshToken && req.method === 'POST') {
+        try {
+          const body = await req.json();
+          refreshToken = body.refresh_token;
+          if (body.opt) opt = String(body.opt);
+        } catch {
+          // ignore json parse error
+        }
+      }
 
       if (!refreshToken) {
         return new Response('Missing refresh_token parameter', { status: 400 });
