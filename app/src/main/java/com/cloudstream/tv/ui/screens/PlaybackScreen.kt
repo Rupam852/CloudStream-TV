@@ -37,6 +37,15 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.SubtitlesOff
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.media3.common.C
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import android.media.audiofx.LoudnessEnhancer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -95,6 +104,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
+
+data class MediaTrackInfo(
+    val id: String,
+    val name: String,
+    val groupIndex: Int,
+    val trackIndex: Int,
+    val isSelected: Boolean
+)
 
 enum class ControlsFocusTarget {
     PlayPause,
@@ -280,6 +297,107 @@ fun PlaybackScreen(
     var showNetworkDialog by remember { mutableStateOf(false) }
     var pendingNetworkAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var resolveTrigger by remember { mutableIntStateOf(0) }
+
+    // Multi-Audio & Subtitles track selection states
+    var showAudioTrackDialog by remember { mutableStateOf(false) }
+    var showSubtitleTrackDialog by remember { mutableStateOf(false) }
+    var availableAudioTracks by remember { mutableStateOf<List<MediaTrackInfo>>(emptyList()) }
+    var availableSubtitleTracks by remember { mutableStateOf<List<MediaTrackInfo>>(emptyList()) }
+    var isSubtitlesDisabled by remember { mutableStateOf(true) }
+
+    fun updateAvailableTracks(tracks: Tracks) {
+        val audioList = mutableListOf<MediaTrackInfo>()
+        val subList = mutableListOf<MediaTrackInfo>()
+        val isSubDisabled = exoPlayer.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)
+        isSubtitlesDisabled = isSubDisabled
+
+        for (groupIndex in 0 until tracks.groups.size) {
+            val group = tracks.groups[groupIndex]
+            if (group.type == C.TRACK_TYPE_AUDIO) {
+                for (trackIndex in 0 until group.length) {
+                    val format = group.getTrackFormat(trackIndex)
+                    val isSelected = group.isTrackSelected(trackIndex)
+                    val langCode = format.language ?: "und"
+                    val langName = Locale(langCode).displayLanguage.ifBlank { "Track ${audioList.size + 1}" }
+                    val label = format.label ?: ""
+                    val channels = when (format.channelCount) {
+                        6 -> "5.1"
+                        8 -> "7.1"
+                        2 -> "Stereo"
+                        else -> ""
+                    }
+                    val displayName = buildString {
+                        append(langName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() })
+                        if (label.isNotBlank()) append(" • $label")
+                        if (channels.isNotBlank()) append(" [$channels]")
+                    }
+                    audioList.add(
+                        MediaTrackInfo(
+                            id = "audio-$groupIndex-$trackIndex",
+                            name = displayName,
+                            groupIndex = groupIndex,
+                            trackIndex = trackIndex,
+                            isSelected = isSelected
+                        )
+                    )
+                }
+            } else if (group.type == C.TRACK_TYPE_TEXT) {
+                for (trackIndex in 0 until group.length) {
+                    val format = group.getTrackFormat(trackIndex)
+                    val isSelected = !isSubDisabled && group.isTrackSelected(trackIndex)
+                    val langCode = format.language ?: "und"
+                    val langName = Locale(langCode).displayLanguage.ifBlank { "Subtitle ${subList.size + 1}" }
+                    val label = format.label ?: ""
+                    val displayName = buildString {
+                        append(langName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() })
+                        if (label.isNotBlank()) append(" • $label")
+                    }
+                    subList.add(
+                        MediaTrackInfo(
+                            id = "sub-$groupIndex-$trackIndex",
+                            name = displayName,
+                            groupIndex = groupIndex,
+                            trackIndex = trackIndex,
+                            isSelected = isSelected
+                        )
+                    )
+                }
+            }
+        }
+        availableAudioTracks = audioList
+        availableSubtitleTracks = subList
+    }
+
+    fun selectAudioTrack(track: MediaTrackInfo) {
+        val group = exoPlayer.currentTracks.groups.getOrNull(track.groupIndex) ?: return
+        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+            .buildUpon()
+            .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, track.trackIndex))
+            .build()
+        showToast("Audio: ${track.name}", Icons.Default.Translate)
+        showAudioTrackDialog = false
+    }
+
+    fun selectSubtitleTrack(track: MediaTrackInfo?) {
+        if (track == null) {
+            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                .build()
+            isSubtitlesDisabled = true
+            showToast("Subtitles: Off", Icons.Default.SubtitlesOff)
+        } else {
+            val group = exoPlayer.currentTracks.groups.getOrNull(track.groupIndex) ?: return
+            exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, track.trackIndex))
+                .build()
+            isSubtitlesDisabled = false
+            showToast("Subtitles: ${track.name}", Icons.Default.Subtitles)
+        }
+        showSubtitleTrackDialog = false
+    }
 
     // Resolve URL on change
     LaunchedEffect(activeFile, resolveTrigger) {
@@ -549,7 +667,12 @@ fun PlaybackScreen(
                     showToast("Playback error: ${error.localizedMessage ?: "Unknown error"}", Icons.Default.Pause)
                 }
             }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                updateAvailableTracks(tracks)
+            }
         }
+        updateAvailableTracks(exoPlayer.currentTracks)
         exoPlayer.addListener(listener)
         onDispose {
             // Unhook listener first before any other cleanup
@@ -1059,6 +1182,34 @@ fun PlaybackScreen(
 
                         Spacer(modifier = Modifier.weight(1f))
 
+                        // Audio Language Selector (Multi-Audio Tracks)
+                        IconButton(
+                            icon = Icons.Default.Translate,
+                            contentDescription = "Audio Language",
+                            onClick = {
+                                showControls()
+                                if (availableAudioTracks.isEmpty()) {
+                                    showToast("Single Audio Track", Icons.Default.Translate)
+                                } else {
+                                    showAudioTrackDialog = true
+                                }
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        // Subtitles Selector (CC / ESub)
+                        IconButton(
+                            icon = if (isSubtitlesDisabled) Icons.Default.SubtitlesOff else Icons.Default.Subtitles,
+                            contentDescription = "Subtitles",
+                            onClick = {
+                                showControls()
+                                showSubtitleTrackDialog = true
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
                         // Aspect Ratio Toggle
                         IconButton(
                             icon = Icons.Default.AspectRatio,
@@ -1211,6 +1362,166 @@ fun PlaybackScreen(
                     pendingNetworkAction = null
                 }
             )
+        }
+
+        if (showAudioTrackDialog) {
+            TrackSelectionDialog(
+                title = "Select Audio Language",
+                icon = Icons.Default.Translate,
+                tracks = availableAudioTracks,
+                hasOffOption = false,
+                onSelectTrack = { track ->
+                    selectAudioTrack(track)
+                },
+                onDismiss = { showAudioTrackDialog = false }
+            )
+        }
+
+        if (showSubtitleTrackDialog) {
+            TrackSelectionDialog(
+                title = "Subtitles (CC)",
+                icon = Icons.Default.Subtitles,
+                tracks = availableSubtitleTracks,
+                hasOffOption = true,
+                isOffSelected = isSubtitlesDisabled,
+                onSelectOff = {
+                    selectSubtitleTrack(null)
+                },
+                onSelectTrack = { track ->
+                    selectSubtitleTrack(track)
+                },
+                onDismiss = { showSubtitleTrackDialog = false }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun TrackSelectionDialog(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tracks: List<MediaTrackInfo>,
+    hasOffOption: Boolean = false,
+    isOffSelected: Boolean = false,
+    onSelectOff: () -> Unit = {},
+    onSelectTrack: (MediaTrackInfo) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.75f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(420.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFF1E293B))
+                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
+                    .padding(24.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (hasOffOption) {
+                        TVFocusableItem(
+                            onClick = onSelectOff,
+                            shape = RoundedCornerShape(8.dp),
+                            containerColor = if (isOffSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f),
+                            focusedContainerColor = MaterialTheme.colorScheme.primary
+                        ) { isFocused ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Off",
+                                    color = if (isFocused) MaterialTheme.colorScheme.onPrimary else Color.White,
+                                    fontWeight = if (isOffSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                                if (isOffSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (tracks.isEmpty() && !hasOffOption) {
+                        Text(
+                            text = "No additional audio tracks found",
+                            color = Color.White.copy(alpha = 0.6f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                    }
+
+                    tracks.forEach { track ->
+                        TVFocusableItem(
+                            onClick = { onSelectTrack(track) },
+                            shape = RoundedCornerShape(8.dp),
+                            containerColor = if (track.isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f),
+                            focusedContainerColor = MaterialTheme.colorScheme.primary
+                        ) { isFocused ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = track.name,
+                                    color = if (isFocused) MaterialTheme.colorScheme.onPrimary else Color.White,
+                                    fontWeight = if (track.isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                                if (track.isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = if (isFocused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
