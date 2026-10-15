@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -41,6 +42,11 @@ import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.SubtitlesOff
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.media3.common.C
@@ -298,9 +304,10 @@ fun PlaybackScreen(
     var pendingNetworkAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var resolveTrigger by remember { mutableIntStateOf(0) }
 
-    // Multi-Audio & Subtitles track selection states
+    // Multi-Audio, Subtitles & Episodes selection states
     var showAudioTrackDialog by remember { mutableStateOf(false) }
     var showSubtitleTrackDialog by remember { mutableStateOf(false) }
+    var showEpisodesDialog by remember { mutableStateOf(false) }
     var availableAudioTracks by remember { mutableStateOf<List<MediaTrackInfo>>(emptyList()) }
     var availableSubtitleTracks by remember { mutableStateOf<List<MediaTrackInfo>>(emptyList()) }
     var isSubtitlesDisabled by remember { mutableStateOf(true) }
@@ -1180,6 +1187,20 @@ fun PlaybackScreen(
                             enabled = activeIndex < playlist.size - 1
                         )
 
+                        // Episodes / Playlist Quick Selector (visible when multiple videos in folder)
+                        if (playlist.size > 1) {
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            IconButton(
+                                icon = Icons.Default.VideoLibrary,
+                                contentDescription = "Episodes (${activeIndex + 1}/${playlist.size})",
+                                onClick = {
+                                    showControls()
+                                    showEpisodesDialog = true
+                                }
+                            )
+                        }
+
                         Spacer(modifier = Modifier.weight(1f))
 
                         // Audio Language Selector (Multi-Audio Tracks)
@@ -1392,6 +1413,178 @@ fun PlaybackScreen(
                 },
                 onDismiss = { showSubtitleTrackDialog = false }
             )
+        }
+
+        if (showEpisodesDialog) {
+            EpisodesSelectionDialog(
+                playlist = playlist,
+                currentIndex = activeIndex,
+                repository = repository,
+                onSelectEpisode = { index ->
+                    if (index != activeIndex) {
+                        activeIndex = index
+                        val nextFile = playlist.getOrNull(index)
+                        showToast("Playing ${nextFile?.name ?: "Episode"}", Icons.Default.PlayArrow)
+                    }
+                    showEpisodesDialog = false
+                },
+                onDismiss = { showEpisodesDialog = false }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun EpisodesSelectionDialog(
+    playlist: List<DriveFile>,
+    currentIndex: Int,
+    repository: DriveRepository,
+    onSelectEpisode: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (currentIndex - 2).coerceAtLeast(0))
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.75f)),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(460.dp)
+                    .background(Color(0xFF0F172A))
+                    .border(
+                        width = 1.dp,
+                        color = Color.White.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
+                    )
+                    .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
+                    .padding(24.dp)
+            ) {
+                // Header
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.VideoLibrary,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column {
+                        Text(
+                            text = "Episodes & Videos",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "${playlist.size} items in this folder",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // List of episodes
+                LazyColumn(
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    itemsIndexed(playlist, key = { _, item -> item.id }) { index, file ->
+                        val isPlaying = index == currentIndex
+                        val isWatched = repository.isWatched(file.id)
+                        val fileSizeMB = file.size?.let { it / (1024 * 1024) } ?: 0L
+
+                        TVFocusableItem(
+                            onClick = { onSelectEpisode(index) },
+                            shape = RoundedCornerShape(10.dp),
+                            containerColor = if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.05f),
+                            focusedContainerColor = MaterialTheme.colorScheme.primary
+                        ) { isFocused ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Index badge
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(
+                                            if (isPlaying) MaterialTheme.colorScheme.primary
+                                            else Color.White.copy(alpha = 0.1f)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isPlaying) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = "Playing",
+                                            tint = Color.Black,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "${index + 1}",
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.labelMedium
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = file.name,
+                                        color = if (isFocused) MaterialTheme.colorScheme.onPrimary else Color.White,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = if (isFocused) Modifier.basicMarquee() else Modifier
+                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (fileSizeMB > 0) {
+                                            Text(
+                                                text = if (fileSizeMB > 1024) String.format(Locale.getDefault(), "%.1f GB", fileSizeMB / 1024.0) else "$fileSizeMB MB",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = if (isFocused) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.5f)
+                                            )
+                                        }
+                                        if (isWatched) {
+                                            Text(
+                                                text = "✓ Watched",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color(0xFF10B981),
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
