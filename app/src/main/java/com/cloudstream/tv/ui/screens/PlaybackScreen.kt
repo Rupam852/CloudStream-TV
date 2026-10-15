@@ -167,24 +167,30 @@ fun PlaybackScreen(
     }
 
     // Initialize ExoPlayer
+    // Initialize ExoPlayer with optimized buffer control and hardware decoder fallback
     val exoPlayer = remember {
-        // ZERO-BUFFERING LOAD CONTROL
-        // Buffers up to 3 minutes ahead in the background and keeps 30 seconds back-buffer for instant rewind.
+        val allocator = androidx.media3.exoplayer.upstream.DefaultAllocator(true, 64 * 1024)
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setAllocator(allocator)
             .setBufferDurationsMs(
-                15_000,  // minBufferMs (15s minimum ahead for instant responsive streaming)
-                60_000,  // maxBufferMs (1 minute maximum buffer)
-                1_000,   // bufferForPlaybackMs (instant 1s fast startup)
-                1_500    // bufferForPlaybackAfterRebufferMs (fast 1.5s rebuffer on seek)
+                35_000,  // minBufferMs (35s minimum ahead to absorb any Wi-Fi jitter)
+                120_000, // maxBufferMs (2 minutes maximum buffer)
+                2_000,   // bufferForPlaybackMs (instant 2s fast and clean startup)
+                5_000    // bufferForPlaybackAfterRebufferMs (5s solid buffer if network ever dips, preventing stutter loops!)
             )
             .setBackBuffer(
-                15_000,  // backBufferDurationMs (15s rewind kept in RAM)
+                30_000,  // backBufferDurationMs (30s rewind kept in RAM)
                 true     // retainBackBufferFromKeyframe
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
-        ExoPlayer.Builder(context)
+        val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context).apply {
+            setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+            setEnableDecoderFallback(true) // Crucial on Android TV to prevent frame drops on HEVC/H.264
+        }
+
+        ExoPlayer.Builder(context, renderersFactory)
             .setLoadControl(loadControl)
             .setSeekParameters(androidx.media3.exoplayer.SeekParameters.CLOSEST_SYNC)
             .build().apply {
@@ -359,9 +365,9 @@ fun PlaybackScreen(
         val tokenRefreshingClient = OkHttpClient.Builder()
             .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
             .retryOnConnectionFailure(true)
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .authenticator { _, response ->
                 // Called automatically by OkHttp when it receives a 401 Unauthorized.
                 // Guard against infinite retry loop (max 1 retry per request).
@@ -370,9 +376,7 @@ fun PlaybackScreen(
                     return@authenticator null
                 }
                 Log.w("PlaybackScreen", "Got 401 during streaming — refreshing OAuth token")
-                // runBlocking is safe here: OkHttp Authenticator always runs on an IO thread,
-                // never on the main thread.
-                val newToken = runBlocking { repository.getAccessToken() }
+                val newToken = runBlocking { repository.getAccessToken(forceRefresh = true) }
                 if (newToken != null) {
                     Log.i("PlaybackScreen", "Token refreshed successfully — retrying chunk request")
                     response.request.newBuilder()
@@ -393,12 +397,15 @@ fun PlaybackScreen(
             }
         }
 
+        // Wrap with 350MB LRU disk cache so downloaded chunks stream smoothly from local storage without re-buffering
+        val cacheDataSourceFactory = VideoCacheManager.buildCacheDataSourceFactory(context, okHttpDataSourceFactory)
+
         val extractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory().apply {
             setConstantBitrateSeekingEnabled(true)
             setConstantBitrateSeekingAlwaysEnabled(true)
         }
 
-        val mediaSource = ProgressiveMediaSource.Factory(okHttpDataSourceFactory, extractorsFactory)
+        val mediaSource = ProgressiveMediaSource.Factory(cacheDataSourceFactory, extractorsFactory)
             .createMediaSource(mediaItem)
 
         exoPlayer.setMediaSource(mediaSource)
@@ -415,78 +422,21 @@ fun PlaybackScreen(
         exoPlayer.play()
     }
 
-    // TOKEN EXPIRY FIX — Defense 1: Proactive Token Watchdog
-    // Runs silently in background every 45 minutes during playback.
-    // Google OAuth tokens expire after 1 hour. By refreshing at 45 min, the token
-    // is ALWAYS fresh — the Authenticator (Defense 2) serves as the last safety net
-    // in case this misses (e.g. app was backgrounded and resumed).
+    // TOKEN EXPIRY WATCHDOG:
+    // Runs in the background to keep OAuth token fresh in SharedPreferences.
+    // Notice: We do NOT re-create or reset the MediaSource here, because resetting the MediaSource
+    // causes a freeze/stutter in the video! The OkHttp Authenticator seamlessly uses the fresh token.
     LaunchedEffect(resolvedUrl) {
         if (resolvedUrl == null || oauthToken == null) return@LaunchedEffect
-        // Wait 45 minutes before first proactive refresh
-        delay(45 * 60 * 1000L)
+        // Check proactively every 45 minutes
         while (true) {
-            Log.i("PlaybackScreen", "Token watchdog: proactively refreshing OAuth token")
-            val currentPos = currentPosition // BUG-07 Fix: read from Compose state, not exoPlayer directly
-            val wasPlaying = exoPlayer.playWhenReady
-            // BUG-07 Fix: Always fetch the fresh token from repository.
-            // Do NOT compare against `oauthToken` Compose state — it may be stale.
-            // getAccessToken() already handles whether refresh is actually needed.
-            val previousToken = oauthToken
-            val newToken = repository.getAccessToken()
-            if (newToken != null && newToken != previousToken) {
-                val url = resolvedUrl ?: break
-                val mimeType = when {
-                    activeFile.name.endsWith(".mkv", ignoreCase = true) || (activeFile.mimeType.contains("matroska", ignoreCase = true)) -> androidx.media3.common.MimeTypes.APPLICATION_MATROSKA
-                    activeFile.name.endsWith(".mp4", ignoreCase = true) || (activeFile.mimeType.contains("mp4", ignoreCase = true)) -> androidx.media3.common.MimeTypes.APPLICATION_MP4
-                    activeFile.name.endsWith(".webm", ignoreCase = true) || (activeFile.mimeType.contains("webm", ignoreCase = true)) -> androidx.media3.common.MimeTypes.APPLICATION_WEBM
-                    else -> null
-                }
-                val mediaItem = MediaItem.Builder()
-                    .setUri(url)
-                    .apply {
-                        if (mimeType != null) {
-                            setMimeType(mimeType)
-                        }
-                    }
-                    .build()
-                val refreshedClient = OkHttpClient.Builder()
-                    .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
-                    .retryOnConnectionFailure(true)
-                    .connectTimeout(15, TimeUnit.SECONDS)
-                    .readTimeout(30, TimeUnit.SECONDS)
-                    .writeTimeout(15, TimeUnit.SECONDS)
-                    .authenticator { _, response ->
-                        if (response.request.header("X-Token-Refreshed") != null) return@authenticator null
-                        val refreshed = runBlocking { repository.getAccessToken() }
-                        refreshed?.let {
-                            response.request.newBuilder()
-                                .header("Authorization", "Bearer $it")
-                                .header("X-Token-Refreshed", "true")
-                                .build()
-                        }
-                    }
-                    .build()
-                val newFactory = OkHttpDataSource.Factory(refreshedClient).apply {
-                    setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    if (newToken != null) {
-                        setDefaultRequestProperties(mapOf("Authorization" to "Bearer $newToken"))
-                    }
-                }
-                val newExtractors = androidx.media3.extractor.DefaultExtractorsFactory().apply {
-                    setConstantBitrateSeekingEnabled(true)
-                    setConstantBitrateSeekingAlwaysEnabled(true)
-                }
-                val newSource = ProgressiveMediaSource.Factory(newFactory, newExtractors)
-                    .createMediaSource(mediaItem)
-                exoPlayer.setMediaSource(newSource, currentPos)
-                exoPlayer.prepare()
-                if (wasPlaying) exoPlayer.play()
-                oauthToken = newToken
-            } else {
-                Log.i("PlaybackScreen", "Token watchdog: token still valid, no rebuild needed")
-            }
-            // Check again in 45 minutes
             delay(45 * 60 * 1000L)
+            Log.i("PlaybackScreen", "Token watchdog: proactively checking and refreshing OAuth token")
+            val newToken = repository.getAccessToken()
+            if (newToken != null && newToken != oauthToken) {
+                oauthToken = newToken
+                Log.i("PlaybackScreen", "Token watchdog: updated token successfully in background without interrupting video")
+            }
         }
     }
 

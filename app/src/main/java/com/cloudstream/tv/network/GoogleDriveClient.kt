@@ -145,22 +145,21 @@ object GoogleDriveClient {
             return@withContext fileId
         }
 
-        // If Cloudflare Worker CDN proxy is configured, route stream through Cloudflare Edge
-        if (!cdnProxyUrl.isNullOrBlank()) {
-            val baseCdn = cdnProxyUrl.trim().trimEnd('/')
-            val endpoint = if (baseCdn.endsWith("/stream")) baseCdn else "$baseCdn/stream"
-            val sb = StringBuilder("$endpoint?fileId=${java.net.URLEncoder.encode(fileId, "UTF-8")}")
-            if (!apiKey.isNullOrBlank()) {
-                sb.append("&key=${java.net.URLEncoder.encode(apiKey, "UTF-8")}")
-            }
-            return@withContext sb.toString()
-        }
-
+        // Priority 1: Direct Google OAuth streaming (Fastest, zero proxy bottleneck, full HTTP 206 byte-range support)
         if (!oauthToken.isNullOrBlank()) {
             return@withContext "https://www.googleapis.com/drive/v3/files/$fileId?alt=media&supportsAllDrives=true"
         }
+
+        // Priority 2: Direct API key streaming
         if (!apiKey.isNullOrBlank()) {
             return@withContext "https://www.googleapis.com/drive/v3/files/$fileId?alt=media&key=$apiKey&supportsAllDrives=true"
+        }
+
+        // Priority 3: Cloudflare Edge CDN proxy for public/unauthenticated streaming
+        if (!cdnProxyUrl.isNullOrBlank()) {
+            val baseCdn = cdnProxyUrl.trim().trimEnd('/')
+            val endpoint = if (baseCdn.endsWith("/stream")) baseCdn else "$baseCdn/stream"
+            return@withContext "$endpoint?fileId=${java.net.URLEncoder.encode(fileId, "UTF-8")}"
         }
         val directUsercontentUrl = "https://drive.usercontent.google.com/download?id=$fileId&export=download&confirm=t"
         val initialUrl = "https://drive.google.com/uc?export=download&id=$fileId"
