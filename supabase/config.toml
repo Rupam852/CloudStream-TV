@@ -1,0 +1,4 @@
+project_id = "tiqebjoqnbaqchljigqz"
+
+[functions.auth-bridge]
+verify_jwt = false
