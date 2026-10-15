@@ -125,15 +125,15 @@ fun HomeScreen(
     val savedFolders = remember { mutableStateListOf<DriveLink>().apply { addAll(repository.getSavedLinks()) } }
     var selectedFolderId by remember { mutableStateOf(repository.getLastSelectedFolderId()) }
     
-    // Navigation stack for folders
-    val folderNavigationStack = remember { mutableStateListOf<String>() }
+    // Navigation stack for folders (restored from repository so returning from video player keeps exact subfolder)
+    val folderNavigationStack = remember { mutableStateListOf<String>().apply { addAll(repository.getFolderNavStack()) } }
     var currentFolderId by remember { mutableStateOf(selectedFolderId) }
 
     // Watched state
     var watchedFileIds by remember { mutableStateOf(repository.getWatchedFileIds()) }
 
     // Files state
-    var filesList by remember { mutableStateOf<List<DriveFile>>(emptyList()) }
+    var filesList by remember { mutableStateOf<List<DriveFile>>(repository.getCachedFolderContents(selectedFolderId ?: "") ?: emptyList()) }
     var isLoadingFiles by remember { mutableStateOf(false) }
     var loadingError by remember { mutableStateOf<String?>(null) }
     
@@ -164,14 +164,20 @@ fun HomeScreen(
     // Load folder contents
     suspend fun loadFolder(folderId: String?) {
         // BUG-18 Fix: Clear stale FocusRequesters from previous folder.
-        // Without this, the map grows indefinitely as user browses many folders.
         fileFocusRequesters.clear()
         if (folderId == null) {
             filesList = emptyList()
             return
         }
         
-        isLoadingFiles = true
+        // 1. Instantly display cached files if available so user never sees a blank screen
+        val cachedFiles = repository.getCachedFolderContents(folderId)
+        if (!cachedFiles.isNullOrEmpty()) {
+            filesList = cachedFiles
+        } else {
+            isLoadingFiles = true
+        }
+        
         loadingError = null
         watchedFileIds = repository.getWatchedFileIds()
         try {
@@ -179,12 +185,32 @@ fun HomeScreen(
                 val isLoggedIn = repository.isLoggedIn()
                 val token = repository.getAccessToken()
                 if (isLoggedIn && token.isNullOrBlank()) {
-                    // Token fetch failed — likely a network/backend issue, not a Drive error
-                    throw java.io.IOException("Could not get access token. Check your connection.")
+                    // Try proactive force-refresh before failing
+                    val forcedToken = repository.getAccessToken(forceRefresh = true)
+                    if (forcedToken.isNullOrBlank()) {
+                        throw java.io.IOException("Could not get access token. Check your connection.")
+                    }
                 }
-                GoogleDriveClient.fetchFolderContents(folderId, repository.getApiKey(), token)
+                
+                try {
+                    GoogleDriveClient.fetchFolderContents(folderId, repository.getApiKey(), repository.getAccessToken())
+                } catch (e: Exception) {
+                    // Auto-refresh & retry on 401/403 (token expired during playback or idle)
+                    if (isLoggedIn && (e.message?.contains("401") == true || e.message?.contains("403") == true)) {
+                        Log.w("HomeScreen", "Received 401/403 while loading folder. Forcing token refresh and retrying...")
+                        val refreshedToken = repository.getAccessToken(forceRefresh = true)
+                        if (!refreshedToken.isNullOrBlank()) {
+                            GoogleDriveClient.fetchFolderContents(folderId, repository.getApiKey(), refreshedToken)
+                        } else {
+                            throw e
+                        }
+                    } else {
+                        throw e
+                    }
+                }
             }
             filesList = results
+            repository.setCachedFolderContents(folderId, results)
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) {
                 throw e
@@ -217,7 +243,10 @@ fun HomeScreen(
                         "Failed to load folder: ${e.localizedMessage}"
                 }
             }
-            filesList = emptyList()
+            // Preserve cached files if available instead of flashing empty folder
+            if (cachedFiles.isNullOrEmpty()) {
+                filesList = emptyList()
+            }
         } finally {
             isLoadingFiles = false
         }
@@ -283,7 +312,9 @@ fun HomeScreen(
             searchQuery = ""
         } else if (folderNavigationStack.isNotEmpty()) {
             val previousFolder = folderNavigationStack.removeAt(folderNavigationStack.lastIndex)
+            repository.popFolderNav()
             currentFolderId = previousFolder
+            repository.setLastSelectedFolderId(previousFolder)
         } else {
             showExitDialog = true
         }
@@ -611,8 +642,12 @@ fun HomeScreen(
                                                 if (file.isFolder) {
                                                     // H1 Fix: Safe null check — currentFolderId can be null on
                                                     // fresh install. Previously used !! which throws NullPointerException.
-                                                    currentFolderId?.let { folderNavigationStack.add(it) }
+                                                    currentFolderId?.let {
+                                                        folderNavigationStack.add(it)
+                                                        repository.pushFolderNav(it)
+                                                    }
                                                     currentFolderId = file.id
+                                                    repository.setLastSelectedFolderId(file.id)
                                                 } else if (file.isVideo) {
                                                     repository.addToRecentlyViewed(file)
                                                     recentlyViewedList = repository.getRecentlyViewed()
@@ -677,8 +712,12 @@ fun HomeScreen(
                                             onClick = {
                                                 if (file.isFolder) {
                                                     // H1 Fix: Safe null check (list view, same fix as grid view)
-                                                    currentFolderId?.let { folderNavigationStack.add(it) }
+                                                    currentFolderId?.let {
+                                                        folderNavigationStack.add(it)
+                                                        repository.pushFolderNav(it)
+                                                    }
                                                     currentFolderId = file.id
+                                                    repository.setLastSelectedFolderId(file.id)
                                                 } else if (file.isVideo) {
                                                     repository.addToRecentlyViewed(file)
                                                     recentlyViewedList = repository.getRecentlyViewed()
@@ -840,6 +879,7 @@ fun HomeScreen(
                                 isSelected = currentFolderId == folder.id && selectedFolderId != "root",
                                 onSelect = {
                                     folderNavigationStack.clear()
+                                    repository.clearFolderNav()
                                     selectedFolderId = folder.id
                                     currentFolderId = folder.id
                                     repository.setLastSelectedFolderId(folder.id)

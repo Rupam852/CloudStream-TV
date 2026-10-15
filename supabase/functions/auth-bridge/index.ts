@@ -79,7 +79,8 @@ serve(async (req) => {
       const redirectUri = `${protocol}//${url.host}/functions/v1/auth-bridge/callback`;
 
       const forceConsent = url.searchParams.get('force_consent') === 'true';
-      const promptParam = forceConsent ? 'consent' : 'select_account';
+      // Always include consent so Google always returns a refresh_token on every login
+      const promptParam = forceConsent ? 'consent' : 'consent select_account';
       const stateParam = forceConsent ? `${sessionId}:force` : `${sessionId}:normal`;
 
       // Change prompt=consent to prompt=select_account so Google doesn't ask for permission scopes again if already consented.
@@ -289,8 +290,8 @@ serve(async (req) => {
 
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
           client_id: clientId,
           client_secret: clientSecret,
           refresh_token: refreshToken,

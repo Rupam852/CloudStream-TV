@@ -685,8 +685,36 @@ object GoogleDriveClient {
         }
     }
 
-    @Suppress("UNUSED_PARAMETER")
     suspend fun refreshAccessToken(clientId: String, clientSecret: String, refreshToken: String): TokenResult = withContext(Dispatchers.IO) {
+        // Attempt 1: Direct Google OAuth Refresh (Fast, reliable, doesn't depend on backend server)
+        try {
+            val formBody = okhttp3.FormBody.Builder()
+                .add("client_id", clientId)
+                .add("client_secret", clientSecret)
+                .add("refresh_token", refreshToken)
+                .add("grant_type", "refresh_token")
+                .build()
+
+            val googleRequest = Request.Builder()
+                .url("https://oauth2.googleapis.com/token")
+                .post(formBody)
+                .build()
+
+            client.newCall(googleRequest).execute().use { response ->
+                val body = response.body?.string() ?: ""
+                if (response.isSuccessful) {
+                    val tokenResponse = Gson().fromJson(body, TokenResponse::class.java)
+                    Log.i(TAG, "Successfully refreshed OAuth access token directly with Google")
+                    return@withContext TokenResult.Success(tokenResponse)
+                } else {
+                    Log.w(TAG, "Direct Google token refresh returned HTTP ${response.code}: $body. Trying backend helper fallback...")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Direct Google token refresh failed with exception: ${e.message}. Trying backend helper fallback...", e)
+        }
+
+        // Attempt 2: Backend helper fallback
         val opt = if (clientId == DEFAULT_CLIENT_ID_2) "2" else "1"
         val request = Request.Builder()
             .url("$BACKEND_URL/api/refresh?refresh_token=$refreshToken&opt=$opt")
@@ -699,7 +727,7 @@ object GoogleDriveClient {
                     TokenResult.Success(tokenResponse)
                 } else {
                     Log.e(TAG, "Refresh token failed via backend with HTTP ${response.code}: $body")
-                    if (response.code in 400..499) {
+                    if (response.code in 400..401 && body.contains("invalid_grant")) {
                         TokenResult.InvalidCredentials
                     } else {
                         TokenResult.TemporaryError

@@ -2,6 +2,7 @@ package com.cloudstream.tv.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.sync.Mutex
@@ -242,6 +243,38 @@ class DriveRepository(context: Context) {
         return links.firstOrNull()?.id
     }
 
+    // In-memory cache for folder contents so files are immediately visible on return
+    private val folderContentsCache = java.util.concurrent.ConcurrentHashMap<String, List<DriveFile>>()
+
+    fun getCachedFolderContents(folderId: String): List<DriveFile>? {
+        return folderContentsCache[folderId]
+    }
+
+    fun setCachedFolderContents(folderId: String, files: List<DriveFile>) {
+        folderContentsCache[folderId] = files
+    }
+
+    fun clearFolderContentsCache() {
+        folderContentsCache.clear()
+    }
+
+    // In-memory navigation stack for subfolders so returning from player keeps exact subfolder
+    private val navStack = mutableListOf<String>()
+
+    fun getFolderNavStack(): List<String> = synchronized(navStack) { navStack.toList() }
+
+    fun pushFolderNav(folderId: String) = synchronized(navStack) {
+        navStack.add(folderId)
+    }
+
+    fun popFolderNav(): String? = synchronized(navStack) {
+        if (navStack.isNotEmpty()) navStack.removeAt(navStack.lastIndex) else null
+    }
+
+    fun clearFolderNav() = synchronized(navStack) {
+        navStack.clear()
+    }
+
     fun setLastSelectedFolderId(id: String?) {
         if (id == null) {
             prefs.edit().remove(KEY_LAST_FOLDER_ID).apply()
@@ -251,15 +284,15 @@ class DriveRepository(context: Context) {
     }
 
     // --- OAuth 2.0 Token Management ---
-    suspend fun getAccessToken(): String? {
+    suspend fun getAccessToken(forceRefresh: Boolean = false): String? {
         val accessToken = prefs.getString(KEY_OAUTH_ACCESS_TOKEN, null)
         val refreshToken = prefs.getString(KEY_OAUTH_REFRESH_TOKEN, null)
         val expiry = prefs.getLong(KEY_OAUTH_EXPIRY, 0L)
         
         if (accessToken == null && refreshToken == null) return null
         
-        // Quick check without lock
-        if (accessToken != null) {
+        // Quick check without lock if not forcing refresh
+        if (!forceRefresh && accessToken != null) {
             val isExpired = System.currentTimeMillis() + 300000 > expiry
             if (!isExpired) return accessToken
         }
@@ -268,12 +301,9 @@ class DriveRepository(context: Context) {
         return tokenMutex.withLock {
             val currentAccessToken = prefs.getString(KEY_OAUTH_ACCESS_TOKEN, null)
             val currentExpiry = prefs.getLong(KEY_OAUTH_EXPIRY, 0L)
-            // BUG-05 Fix: Re-read refreshToken from prefs INSIDE the lock.
-            // The outer refreshToken was captured before the lock was acquired — it could
-            // be stale if another coroutine invalidated the token in the meantime.
             val currentRefreshToken = prefs.getString(KEY_OAUTH_REFRESH_TOKEN, null)
 
-            if (currentAccessToken != null && System.currentTimeMillis() + 300000 <= currentExpiry) {
+            if (!forceRefresh && currentAccessToken != null && System.currentTimeMillis() + 300000 <= currentExpiry) {
                 return@withLock currentAccessToken
             }
 
@@ -285,15 +315,17 @@ class DriveRepository(context: Context) {
                         val tokenResponse = result.response
                         if (tokenResponse.access_token != null) {
                             val newAccessToken = tokenResponse.access_token
+                            val updatedRefreshToken = tokenResponse.refresh_token ?: currentRefreshToken
                             val newExpiry = System.currentTimeMillis() + (tokenResponse.expires_in ?: 3600) * 1000
-                            saveOAuthTokens(newAccessToken, currentRefreshToken, newExpiry, getOAuthEmail())
+                            saveOAuthTokens(newAccessToken, updatedRefreshToken, newExpiry, getOAuthEmail(), clientId, clientSecret)
                             newAccessToken
                         } else {
                             currentAccessToken
                         }
                     }
                     is com.cloudstream.tv.network.TokenResult.InvalidCredentials -> {
-                        clearOAuthTokens()
+                        // Log warning but DO NOT aggressively clear refresh token on intermittent network/auth errors
+                        Log.w("DriveRepository", "Token refresh reported invalid credentials. Retaining refresh token for user retry.")
                         null
                     }
                     else -> {
